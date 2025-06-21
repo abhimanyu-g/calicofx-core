@@ -1,4 +1,5 @@
 #pragma once
+
 #include <string>
 #include <syslog.h>
 #include <cstdarg>
@@ -12,7 +13,7 @@
 
 class Logger {
 public:
-  static void init(const std::string& ident = "MyApp");
+  static void init(const std::string& appName = "MyApp");
   static void shutdown();
   static void log(int level, const char *fmt, ...);
 };

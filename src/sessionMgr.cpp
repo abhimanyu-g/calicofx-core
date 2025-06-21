@@ -1,11 +1,6 @@
 #include "common.hpp"
 #include "sessionMgr.hpp"
 
-//plugins
-#include "lv2PluginMgr.hpp"
-#include "pw-client.hpp"
-
-// TODO: mediabackends
 
 bool SessionMgr::initialized = false;
 
@@ -14,11 +9,7 @@ int SessionMgr::process_cb(struct bufferDesc *buffDesc, void *userData) {return 
 SessionMgr::SessionMgr() {
   if (!initialized) {
     // One time initializations
-
-    // plugin managers/handlers ///////////////////////////////////////////////
     LV2PluginHandler::initalizeLv2Lib();
-
-    // media managers /////////////////////////////////////////////////////////
     PipeWireClient::initializePwLib();
 
     initialized = true;

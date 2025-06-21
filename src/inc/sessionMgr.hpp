@@ -1,9 +1,20 @@
 #pragma once
 
+#include "lv2PluginMgr.hpp"
+#include "pw-client.hpp"
+
 typedef struct node{
 
 }node_t;
 
+/*
+ *TODOs
+ * - createNode with lv2 plugin and pw client
+ * - deleteNode and free plugin and pw client instances
+ * - connectPort srcPluginName:portName -> dstPluginName:portName
+ * - disconnectPort srcPluginName:portName x-x dstPluginName:portName
+ * - activateNode to activate the lv2 and pw client instances
+ */
 class SessionMgr {
 private:
   static bool initialized;

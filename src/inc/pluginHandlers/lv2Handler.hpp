@@ -16,10 +16,6 @@ struct controlPortDesc{
 
 class LV2PluginHandler {
 private:
-  static LilvWorld *world;
-  static LilvPlugins *plugins;
-  static LilvNode *lilv_audio_class, *lilv_input_class, *lilv_output_class,
-    *lilv_control_class, *lilv_scale_point_class;
   LilvInstance *instance;
   uint8_t nAudioInPorts, nAudioOutPorts, nControlPorts;
   std::string pluginName;

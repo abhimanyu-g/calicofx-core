@@ -1,46 +1,51 @@
-#include <vector>
 #include <errno.h>
 #include <limits>
+#include <vector>
 
-#include "lilv/lilv.h"
-#include "lv2PluginMgr.hpp"
 #include "common.hpp"
+#include "lilv/lilv.h"
+#include "pluginHandlers/lv2Handler.hpp"
 
-LilvWorld *LV2PluginHandler::world = nullptr;
-LilvPlugins *LV2PluginHandler::plugins = nullptr;
-LilvNode *LV2PluginHandler::lilv_audio_class = nullptr;
-LilvNode *LV2PluginHandler::lilv_input_class = nullptr;
-LilvNode *LV2PluginHandler::lilv_output_class = nullptr;
-LilvNode *LV2PluginHandler::lilv_control_class = nullptr;
-LilvNode *LV2PluginHandler::lilv_scale_point_class = nullptr;
+using namespace std;
 
-static std::vector<std::string> nodesURI;
+static LilvWorld *world = nullptr;
+static LilvPlugins *plugins = nullptr;
+static LilvNode *lilv_audio_class = nullptr;
+static LilvNode *lilv_input_class = nullptr;
+static LilvNode *lilv_output_class = nullptr;
+static LilvNode *lilv_control_class = nullptr;
+static LilvNode *lilv_scale_point_class = nullptr;
+
+static vector<string> nodesURI;
 
 // LV2PluginHandler::~LV2PluginHandler() {
 //   SYSLOG_DBG("Delete lv2 plugin instance");
 // };
 
-int LV2PluginHandler::initalizeLv2Lib() {
+int initalizeLv2Lib() {
   world = lilv_world_new();
   if (!world)
     return -EAGAIN;
 
   // Load all available bundles
   lilv_world_load_all(world);
-  //load all plugins from bundles
-  plugins = (void*)lilv_world_get_all_plugins(world);
-  LILV_FOREACH (plugins, i, plugins ) {
+  // load all plugins from bundles
+  plugins = (void *)lilv_world_get_all_plugins(world);
+  LILV_FOREACH(plugins, i, plugins) {
     const LilvPlugin *p = lilv_plugins_get(plugins, i);
-    std::string node(lilv_node_as_uri(lilv_plugin_get_uri(p)));
+    string node = string(lilv_node_as_uri(lilv_plugin_get_uri(p)));
     nodesURI.push_back(node);
     SYSLOG_DBG("%s\n", node.c_str());
   }
 
-  LV2PluginHandler::lilv_audio_class = lilv_new_uri(world, LV2_CORE__AudioPort);
-  LV2PluginHandler::lilv_input_class = lilv_new_uri(world, LV2_CORE__InputPort);
-  LV2PluginHandler::lilv_output_class = lilv_new_uri(world, LV2_CORE__OutputPort);
-  LV2PluginHandler::lilv_control_class = lilv_new_uri(world, LV2_CORE__ControlPort);
-  LV2PluginHandler::lilv_scale_point_class = lilv_new_uri(world, LV2_CORE__ScalePoint);
+  lilv_audio_class = lilv_new_uri(world, LV2_CORE__AudioPort);
+  lilv_input_class = lilv_new_uri(world, LV2_CORE__InputPort);
+  lilv_output_class =
+    lilv_new_uri(world, LV2_CORE__OutputPort);
+  lilv_control_class =
+    lilv_new_uri(world, LV2_CORE__ControlPort);
+  lilv_scale_point_class =
+    lilv_new_uri(world, LV2_CORE__ScalePoint);
   return 0;
 }
 
@@ -56,20 +61,19 @@ void LV2PluginHandler::populatePorts(const LilvPlugin *plugin, uint8_t nPorts) {
     const LilvPort *port = lilv_plugin_get_port_by_index(plugin, idx);
     LilvNode *portName = lilv_port_get_name(plugin, port);
 
-    desc.label = std::string(lilv_node_as_string(portName));
+    desc.label = string(lilv_node_as_string(portName));
     desc.index = idx;
 
     // audio ports
     if (lilv_port_is_a(plugin, port, lilv_audio_class)) {
       if (lilv_port_is_a(plugin, port, lilv_input_class)) {
-	// audio-in ports
-	this->audioInPortDesc.push_back(desc);
-	this->nAudioInPorts++;
-      }
-      else {
-	// audio-out ports
-	this->audioOutPortDesc.push_back(desc);
-	this->nAudioOutPorts++;
+        // audio-in ports
+        this->audioInPortDesc.push_back(desc);
+        this->nAudioInPorts++;
+      } else {
+        // audio-out ports
+        this->audioOutPortDesc.push_back(desc);
+        this->nAudioOutPorts++;
       }
     }
 
@@ -80,7 +84,7 @@ void LV2PluginHandler::populatePorts(const LilvPlugin *plugin, uint8_t nPorts) {
 
       ctrlPortDesc.portInfo = desc;
       ctrlPortDesc.def = ctrlPortDesc.min = ctrlPortDesc.max =
-	ctrlPortDesc.val = std::numeric_limits<float>::max();
+          ctrlPortDesc.val = numeric_limits<float>::max();
       ctrlPortDesc.hasScalePoints = false;
 
       this->nControlPorts++;
@@ -88,22 +92,22 @@ void LV2PluginHandler::populatePorts(const LilvPlugin *plugin, uint8_t nPorts) {
 
       if (def) {
         ctrlPortDesc.def = lilv_node_as_float(def);
-	lilv_node_free(def);
+        lilv_node_free(def);
       }
       if (min) {
         ctrlPortDesc.min = lilv_node_as_float(min);
-	lilv_node_free(min);
+        lilv_node_free(min);
       }
       if (max) {
         ctrlPortDesc.max = lilv_node_as_float(max);
-	lilv_node_free(max);
+        lilv_node_free(max);
       }
 
       sp = lilv_port_get_scale_points(plugin, port);
       if (sp) {
         ctrlPortDesc.hasScalePoints = true;
-	// TODO: Parse and add scale points
-	lilv_scale_points_free(sp);
+        // TODO: Parse and add scale points
+        lilv_scale_points_free(sp);
       }
     }
     lilv_node_free(portName);
@@ -115,14 +119,13 @@ void LV2PluginHandler::connectControlPorts() {
                                &portDesc.val);
     portDesc.val = (portDesc.def) ? portDesc.def : 0.0;
   }
-
 }
 
 void LV2PluginHandler::activateInstance() {
   lilv_instance_activate(this->instance);
 }
 
-LV2PluginHandler::LV2PluginHandler(const std::string &URI, double sample_rate) {
+LV2PluginHandler::LV2PluginHandler(const string &URI, double sample_rate) {
   uint8_t nPorts = 0;
   LilvNode *node;
   LilvNode *plugin_uri = lilv_new_uri(world, URI.c_str());
@@ -131,7 +134,7 @@ LV2PluginHandler::LV2PluginHandler(const std::string &URI, double sample_rate) {
     nPorts = lilv_plugin_get_num_ports(plugin);
 
     node = lilv_plugin_get_name(plugin);
-    this->pluginName = std::string(lilv_node_as_string(node));
+    this->pluginName = string(lilv_node_as_string(node));
 
     populatePorts(plugin, nPorts);
     connectControlPorts();
