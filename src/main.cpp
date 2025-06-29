@@ -1,15 +1,32 @@
 #include "common.hpp"
-//#include "lv2PluginMgr.hpp"
-//#include "sessionMgr.hpp"
+#include "pw-client.hpp"
+#include <atomic>
+#include <thread>
+#include <unistd.h>
 
-int main(void) {
+std::atomic<bool> bExitIpcLoop(false);
+void ipcMsgHandler(void) {
+  ipcMsg_t ipcMsg = IPC_CREATE_INSTANCE;
+  while (!bExitIpcLoop) {
+    // TODO: Handle messages here
+    switch (ipcMsg) {
+    case IPC_CREATE_INSTANCE:
+      break;
+    case IPC_CONNECT_PORTS:
+      break;
+    case IPC_DISCONNECT_PORTS:
+      break;
+    case IPC_UPDATE_CTRL_PARAM:
+      break;
+    case IPC_DELETE_INSTANCE:
+      break;
+    default:
+      break;
+    }
 
-  Logger::init("calicofx");
-  // SessionMgr session;
-
-  // session.createNode("http://guitarix.sourceforge.net/plugins/gxautowah#wah");
-
-  while (1);
+    sleep(200);
+  }
+}
 
 int main(void) {
   std::thread ipcHandler;
