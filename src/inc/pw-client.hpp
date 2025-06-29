@@ -11,10 +11,22 @@ struct bufferDesc{
   std::vector<float *> outBuff;
 };
 
+typedef enum actions{
+  ACTION_CREATE_INSTANCE = 0,
+  ACTION_CONNECT_PORTS,
+  ACTION_DISCONNECT_PORTS,
+  ACTION_UPDATE_CTRL_PARAM,
+  ACTION_DELETE_INSTANCE
+}action_t;
+
+int pwInitializeLib();
+int pwDeinitalizeLib();
+void pwRunMainLoop();
+
+int pwActionDispatchHandler(action_t dispatchAction, void *payload);
+
 class PipeWireClient{
 private:
-  static struct pw_main_loop *loop;
-  static struct pw_context *context;
   struct pw_filter *filter;
 
   typedef int (*process_cb)(struct bufferDesc *, void *);

@@ -11,7 +11,17 @@ int main(void) {
 
   while (1);
 
+int main(void) {
+  std::thread ipcHandler;
+  Logger::init("calicofx");
+  pwInitializeLib();
 
+  ipcHandler = std::thread(ipcMsgHandler);
+  pwRunMainLoop();
 
+  if (ipcHandler.joinable()) {
+    ipcHandler.join();
+  }
+  pwDeinitalizeLib();
   return 0;
 }
