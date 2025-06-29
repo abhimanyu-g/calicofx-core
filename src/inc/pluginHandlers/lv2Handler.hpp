@@ -3,6 +3,8 @@
 #include <vector>
 #include <string>
 
+#include "basePluginHandler.hpp"
+
 struct portDesc{
   std::string label;
   uint8_t index;
@@ -14,7 +16,11 @@ struct controlPortDesc{
   bool hasScalePoints;
 };
 
-class LV2PluginHandler {
+// Global initialize variable
+int pluginLv2Initialize();
+int pluginLv2Deinitalize();
+
+class LV2PluginHandler:public BasePluginHandler{
 private:
   LilvInstance *instance;
   uint8_t nAudioInPorts, nAudioOutPorts, nControlPorts;
@@ -24,44 +30,17 @@ private:
 
   // Private Prototypes
   void populatePorts(const LilvPlugin *plugin, uint8_t nPorts);
-  void connectControlPorts(void);
+
 public:
-  /**
-   * @brief      Constructor
-   * @details    Initializes lilvplugin library
-   * @param      URI: Plugin's unique identifier
-   * @param      sample_rate: rate of audio sampling
-   * @return     N/A
-   */
-  LV2PluginHandler(const std::string &URI, double sample_rate);
+  int pluginInit(std::string &pluginURI) override;
+  int pluginActivateInstance() override;
+  int pluginRun(int sampleRate) override;
 
-  /**
-   * @brief      Destructor
-   * @details    Un-initializes Lilv library
-   * @param      void
-   * @return     N/A
-   */
-  //  ~LV2PluginHandler();
+  int pluginConnectPort(int portIdx, float &var) override;
+  int pluginConnectPort(int portIdx, int &var) override;
 
-  /**
-   * @brief      Helper function to Activate plugin
-   * @details    Activate plugin and start processing the data
-   * @param      void
-   * @return     void
-   */
-  void activateInstance();
+  LV2PluginHandler();
+  ~LV2PluginHandler();
 
-  std::string getPluginName() {
-    return this->pluginName;
-  }
-
-  /**
-   * @brief      Initialize Lv2 plugin handler
-   * @details    The function is responsible to initialize
-   *             the lv2 world and load all its plugins
-   * @param      void
-   * @return     < 0 for failure, 0 otherwise
-   */
-  static int initalizeLv2Lib();
-
+  // TODO: Helper functions
 };
