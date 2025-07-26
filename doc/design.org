@@ -1,0 +1,166 @@
+#+TITLE: calico-fx design
+
+* Goal
+Design a guitar effects processing software that is based on server-client mechanism. This software would run on an embedded board and may use the Neural network on the device to generate realistic processing effect. Here is an overview of what I am looking to implement
+- Support lv2 plugins (at least in v1.0)
+- Pipewire backend for all audio routing needs
+- Support Bluetooth overlay for backing track support
+- Front-end has a web interface to interact with the core application
+  #+begin_src plantuml :file images/calicofx-design-overview.png :results output
+    @startuml
+    [Frontend UI] as ui
+    [Calicofx core] as core
+    [Pipewire daemon] as pw
+    [LV2 plugins] as lv2
+
+    ui <--> core : websockets
+    core <--> pw : pipewire-APIs
+    core --> lv2 : lilv2-APIs
+    @enduml
+  #+end_src
+
+* Operation
+During operation, each /lv2 plugin/ instance is wrapped with /Pipewire client/ and connected with /Pipewire daemon/. [[https://pipewire.org/][Pipewire]] is a low-latency multimedia handling framework in Linux that is aimed to replace [[https://jackaudio.org/][JACK]] and [[https://www.freedesktop.org/wiki/Software/PulseAudio/][pulse-audio]] for audio routing.
+
+The user controls the software with web-ui (for now) over websockets and controls
+- Routing(a.k.a Linking)
+- Addition/Deletion
+- Update parameters
+
+In operation, the graph might look something like this
+#+begin_src plantuml :file images/calicofx-flow-graph.png :results output
+  @startuml
+  [Audio source] as in
+  [Audio sink] as out
+  [Pipewire Daemon] as pw
+  [BT (A2DP) Audio Sink] as bt
+  [pw-client + fx-1] as fx1
+  [pw-client + fx-2] as fx2
+  [pw-client + fx-3] as fx3
+  [pw-client + fx-4] as fx4
+
+  in -> pw
+  pw -> out
+  bt --> pw
+  fx1 -up--> pw
+  fx2 -up--> pw
+  fx3 -up--> pw
+  fx4 -up--> pw
+  @enduml
+#+end_src
+
+Note that,
+- "pw client + fx 'x'" Implies lv2 effect wrapped inside pipewire-client
+- Each effect need not be strictly connected to the previous effect as shown in the diagram, since I follow a graph based routing, node linking is up-to the user's configuration
+
+* Class Diagram
+** Overview
+The overall class structure looks something like below. We enforce /pipewire/ as the media manager but the plugins although is /lv2/ now, can change in the future to support more plugin types. Hence, the plugins are abstracted
+#+begin_src plantuml :file images/calicofx-overview-class-dig.png :noweb yes
+  @startuml
+  class "SessionMgr" as mgr
+  class "PipewireClient" as pw
+  abstract class "PluginBase" as base
+  class "LV2Manager" as lv2
+
+  mgr .right.> pw
+  pw .right.> base
+  base <|.. lv2:implements
+
+  @enduml
+#+end_src
+
+** session-manager
+Session manager is responsible to
+- Add/Remove new pw-clients as nodes
+- Access stored nodes for params changes
+- Link/unlink between multiple nodes/pw-clients
+- Save and restore session ( > v1.0)
+
+#+name: SessionMgr
+#+begin_src plantuml :file images/calicofx-session-mgr-class-dig.png
+  @startuml
+  enum ipcCommand{
+        CALICOFX_ADD_NODE
+  }
+  class SessionMgr{
+        -clientMap <string uuid, Client pw-client>
+        -string generateUUID (void)
+        +string sessionAddNode(string uri)
+        +int sessionRemoveNode(string uuid)
+        +int sessionUpdateNodeParam(string uuid, int paramIdx, union paramDataType val)
+        +int sessionLinkPort(string srcNodeUUID, int srcPortIdx, string dstNodeUUID, int dstPortIdx)
+        +int sessionUnlinkNode(string srcNodeUUID, int srcPortIdx, string dstNodeUUID, int dstPortIdx)
+  }
+  @enduml
+#+end_src
+
+** pw-client
+#+name: PipewireClient
+#+begin_src plantuml :file images/calicofx-pw-client-class-dig.png
+  @startuml
+  enum pluginType{
+        PLUGIN_TYPE_LV2
+  }
+  class PipewireClient{
+        -struct pw_thread_loop *loop
+        -struct pw_filter *filter
+        -PluginBase *pluginMgr
+        +int pwInitClient(string uri, enum pluginType pluginType)
+  }
+  @enduml
+#+end_src
+
+
+* Detailed flow
+** Initialization
+Initialization refers to the global initialization and is expected to be called *only once* during the start of the program, there is also a [[*De-initialize][de-initialize]] counterpart which does the opposite
+#+begin_src plantuml :file images/calicofx-initialization.png :exports results
+  @startuml
+  participant "calicofx-core" as core
+  participant "lv2-client" as lv2
+
+  core->lv2:Initialize plugin
+  activate core
+        lv2->lv2:Initalize world (a.k.a create context)
+        lv2->lv2:Load all plugins
+        lv2->core
+  deactivate core
+  @enduml
+#+end_src
+
+** Adding a node
+#+begin_src plantuml :file images/calicofx-adding-a-node.png :results output
+  @startuml
+  participant "front-end" as ui
+  participant "calicofx-core" as core
+  participant "session-manager" as mgr
+  participant "pw-client" as pw
+  participant "lv2-client" as lv2
+
+  ui -> core : CALICOFX_ADD_NODE<uri>
+  core -> mgr: create a new node
+  mgr -> pw: create new pw-client
+  pw -> pw: initialize pw resources
+  pw -> pw: get a 'thread loop'
+  pw -> lv2: populate plugin descriptor for <uri>
+  activate pw
+        lv2 -> lv2: populate plugin description \n(# of audio in , out and control ports,\ntheir names, types, etc...)
+        lv2->pw
+  deactivate pw
+  pw -> pw: create a filter object
+  pw -> pw: add ports to filter object
+  pw -> pw: connect filter to get registered event callbacks
+  pw -> pw: start loop thread
+  pw -> mgr: pw-client object
+  mgr -> mgr: generate uuid
+  mgr -> mgr: save <uuid, pw-client>
+  mgr -> core: uuid
+  core -> ui: <<result, uuid>>
+  @enduml
+#+end_src
+
+#+RESULTS:
+[[file:images/calicofx-adding-a-node.png]]
+
+** De-initialize
