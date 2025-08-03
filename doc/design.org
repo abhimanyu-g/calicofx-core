@@ -82,13 +82,14 @@ Session manager is responsible to
   @startuml
   enum ipcCommand{
         CALICOFX_ADD_NODE
+        CALICOFX_UPDATE_PARAM
   }
   class SessionMgr{
         -clientMap <string uuid, Client pw-client>
         -string generateUUID (void)
         +string sessionAddNode(string uri)
         +int sessionRemoveNode(string uuid)
-        +int sessionUpdateNodeParam(string uuid, int paramIdx, union paramDataType val)
+        +int sessionUpdateNodeParam(int paramIdx, float val)
         +int sessionLinkPort(string srcNodeUUID, int srcPortIdx, string dstNodeUUID, int dstPortIdx)
         +int sessionUnlinkNode(string srcNodeUUID, int srcPortIdx, string dstNodeUUID, int dstPortIdx)
   }
@@ -107,6 +108,7 @@ Session manager is responsible to
         -struct pw_filter *filter
         -PluginBase *pluginMgr
         +int pwInitClient(string uri, enum pluginType pluginType)
+        +int pwUpdateClientParam(int clientPortIdx, float value)
   }
   @enduml
 #+end_src
@@ -143,8 +145,7 @@ This class would solely be controlled by [[*pw-client][pw-client]]. Hence, there
           +virtual int pluginInit()= 0
           +virtual int pluginActivate()= 0
           +virtual int pluginRun(int sampleRate)= 0
-  	+virtual int pluginUpdateParam(uint8_t idx, float val) = 0
-  	+virtual int pluginUpdateParam(uint8_t idx, int val) = 0
+        +virtual int pluginUpdateParam(uint8_t idx, float val) = 0
   }
   @enduml
 #+end_src
@@ -164,11 +165,12 @@ Class responsible to manage lv2 specific operation. I.e,
   	+int pluginInit() @override
   	+int pluginActivate() @override
   	+int pluginRun(int sampleRate) @override
-  	+int pluginUpdateParam(uint8_t idx, float val) @override
-  	+int pluginUpdateParam(uint8_t idx, int val) @override
+        +int pluginUpdateParam(uint8_t idx, float val) @override
   }
   @enduml
 #+end_src
+**** ~pluginUpdateParam~
+ ~pluginUpdateParam~ will internally call [[https://drobilla.net/docs/lilv/index.html#c.lilv_instance_connect_port][lilv_instance_connect_port]] from the /lilv/ library to connect a control port of the current instance to a value and update it, therefore updating the plugin instance's port value.
 
 * Detailed flow
 ** Initialization
@@ -218,5 +220,25 @@ Initialization refers to the global initialization and is expected to be called 
   @enduml
 #+end_src
 
+** Updating a control value
+#+begin_src plantuml :file images/calicofx-update-control-param.png :results output
+  @startuml
+  participant "front-end" as ui
+  participant "calicofx-core" as core
+  participant "session-manager" as mgr
+  participant "pw-client" as pw
+  participant "lv2-client" as lv2
+
+  ui -> core : CALICOFX_UPDATE_PARAM <plugin-uuid, ctrl_idx, val>
+  core -> mgr : update parameter value
+  mgr -> mgr : fetch /pw_client/ from the map
+  mgr -> pw : update params (ctrl_idx, new_val)
+  pw -> lv2 : update params (ctrl_idx, new_val)
+  lv2 -> pw
+  pw -> mgr
+  mgr -> core
+  core -> ui
+  @enduml
+#+end_src
 
 ** De-initialize
