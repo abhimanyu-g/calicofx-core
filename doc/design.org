@@ -6,7 +6,7 @@ Design a guitar effects processing software that is based on server-client mecha
 - Pipewire backend for all audio routing needs
 - Support Bluetooth overlay for backing track support
 - Front-end has a web interface to interact with the core application
-  #+begin_src plantuml :file images/calicofx-design-overview.png :results output
+  #+begin_src plantuml :file /tmp/calicofx-design-overview.png :results output
     @startuml
     [Frontend UI] as ui
     [Calicofx core] as core
@@ -28,7 +28,7 @@ The user controls the software with web-ui (for now) over websockets and control
 - Update parameters
 
 In operation, the graph might look something like this
-#+begin_src plantuml :file images/calicofx-flow-graph.png :results output
+#+begin_src plantuml :file /tmp/calicofx-flow-graph.png :results output
   @startuml
   [Audio source] as in
   [Audio sink] as out
@@ -56,7 +56,7 @@ Note that,
 * Class Diagram
 ** Overview
 The overall class structure looks something like below. We enforce /pipewire/ as the media manager but the plugins although is /lv2/ now, can change in the future to support more plugin types. Hence, the plugins are abstracted
-#+begin_src plantuml :file images/calicofx-overview-class-dig.png :noweb yes
+#+begin_src plantuml :file /tmp/calicofx-overview-class-dig.png :noweb yes
   @startuml
   class "SessionMgr" as mgr
   class "PipewireClient" as pw
@@ -78,7 +78,7 @@ Session manager is responsible to
 - Save and restore session ( > v1.0)
 
 #+name: SessionMgr
-#+begin_src plantuml :file images/calicofx-session-mgr-class-dig.png
+#+begin_src plantuml :file /tmp/calicofx-session-mgr-class-dig.png
   @startuml
   enum ipcCommand{
         CALICOFX_ADD_NODE
@@ -97,7 +97,7 @@ Session manager is responsible to
 
 ** pw-client
 #+name: PipewireClient
-#+begin_src plantuml :file images/calicofx-pw-client-class-dig.png
+#+begin_src plantuml :file /tmp/calicofx-pw-client-class-dig.png
   @startuml
   enum pluginType{
         PLUGIN_TYPE_LV2
@@ -116,7 +116,7 @@ Plugin base is an abstract class which provides the interface to pipewire client
 For the v1.0, we would be supporting only /lv2/ type plugins
 
 This class would solely be controlled by [[*pw-client][pw-client]]. Hence, there is an instance of /Plugin base/ for every instance of /pw-client/
-#+begin_src plantuml :file images/calicofx-plugin-base-class-dig.png :exports results
+#+begin_src plantuml :file /tmp/calicofx-plugin-base-class-dig.png :exports results
   @startuml
   struct portDesc{
   	string label
@@ -154,7 +154,7 @@ Class responsible to manage lv2 specific operation. I.e,
 - Instantiating and un-instantiating a plugin
 - Run a plugin instance for every sample
 
-#+begin_src plantuml :file images/calicofx-lv2-manager-class-dig.png :exports results
+#+begin_src plantuml :file /tmp/calicofx-lv2-manager-class-dig.png :exports results
   @startuml
   class LV2Manager: public PluginBase{
   	-string uri
@@ -173,7 +173,7 @@ Class responsible to manage lv2 specific operation. I.e,
 * Detailed flow
 ** Initialization
 Initialization refers to the global initialization and is expected to be called *only once* during the start of the program, there is also a [[*De-initialize][de-initialize]] counterpart which does the opposite
-#+begin_src plantuml :file images/calicofx-initialization.png :exports results
+#+begin_src plantuml :file /tmp/calicofx-initialization.png :exports results
   @startuml
   participant "calicofx-core" as core
   participant "lv2-client" as lv2
@@ -188,7 +188,7 @@ Initialization refers to the global initialization and is expected to be called 
 #+end_src
 
 ** Adding a node
-#+begin_src plantuml :file images/calicofx-adding-a-node.png :results output
+#+begin_src plantuml :file /tmp/calicofx-adding-a-node.png :results output
   @startuml
   participant "front-end" as ui
   participant "calicofx-core" as core
