@@ -83,6 +83,7 @@ Session manager is responsible to
   enum ipcCommand{
         CALICOFX_ADD_NODE
         CALICOFX_UPDATE_PARAM
+        CALICOFX_LINK
   }
   class SessionMgr{
         -clientMap <string uuid, Client pw-client>
@@ -103,7 +104,7 @@ Following are the common structures that are /file-static/ and share with all th
 - ~pw_thread_loop *loop~
 - ~pw_context *context~
 - ~pw_core *core~
-
+*** class details
 #+name: PipewireClient
 #+begin_src plantuml :file /tmp/calicofx-pw-client-class-dig.png
   @startuml
@@ -115,9 +116,13 @@ Following are the common structures that are /file-static/ and share with all th
         -PluginBase *pluginMgr
         +int pwInitClient(string uri, enum pluginType pluginType)
         +int pwUpdateClientParam(int clientPortIdx, float value)
+        +static int pwLinkClientPorts(string srcNodeUUID, int srcPortIdx, string dstNodeUUID, int dstPortIdx)
   }
   @enduml
 #+end_src
+**** ~pwLinkClientPorts~
+Links (a.k.a connects) the Source's output port to the Destination's input port. It utilizes the /impl/ APIs and calls [[https://docs.pipewire.org/group__pw__impl__link.html#ga7d7c433db2954a961e4980a37168dc6d][pw_context_create_link]] inside.
+It needs to be a static function (probably outside the class) as it operates on more than one pw-client
 
 ** Plugin Base
 Plugin base is an abstract class which provides the interface to pipewire client class. This helps to interface various plugin types (vst, ladspa, clap...).
@@ -251,6 +256,31 @@ Initialization refers to the global initialization and is expected to be called 
   lv2 -> pw
   pw -> mgr
   mgr -> core
+  core -> ui
+  @enduml
+#+end_src
+
+** Linking ports
+Linking ports refer to connection 2 ports in-order to let their data flow from one plugin to another or source to input of a plugin or plugin to the output.
+I have made the decision to not have any assumption about the connection and is left to the user preference. I.e
+- No assumption is made to pre-connect ports when a new plugin is added.
+- No assumption on how the ports are connected one-to-one, one-to-many, many-to-many
+
+However, to establish a link between 2 ports, it is required that the /source port/ is plugin A's =output port= and the /sink port/ is plugin B's =input port=
+#+begin_src plantuml :file /tmp/calicofx-link-ports.png :results output
+  @startuml
+  participant "front-end" as ui
+  participant "calicofx-core" as core
+  participant "session-manager" as mgr
+  participant "pw-client" as pw
+  participant "lv2-client" as lv2
+
+  ui -> core : CALICOFX_LINK <srcUUID, srcPortIdx, dstUUID, dstPortIdx>
+  core -> mgr: link clients
+  mgr -> mgr: get clients from UUID
+  mgr -> pw: pwLinkClientPorts (string srcNodeUUID, int srcPortIdx, string dstNodeUUID, int dstPortIdx)
+  pw -> mgr
+  mgr->core
   core -> ui
   @enduml
 #+end_src
