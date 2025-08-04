@@ -97,6 +97,13 @@ Session manager is responsible to
 #+end_src
 
 ** pw-client
+Since we use threaded main loop in our pw_client, all operations must happen within [[https://docs.pipewire.org/group__pw__thread__loop.html#gaa7996893e812e9eec61f786d1c691c54][pw_thread_loop_lock()]] and [[https://docs.pipewire.org/group__pw__thread__loop.html#ga1f8042dce9da459ec61b6f3a2d6852d8][pw_thread_loop_unlock()]]
+*** Common static structures
+Following are the common structures that are /file-static/ and share with all the dynamically created clients. It is initialized once at the start of the program during [[*Initialization][Initialization]]
+- ~pw_thread_loop *loop~
+- ~pw_context *context~
+- ~pw_core *core~
+
 #+name: PipewireClient
 #+begin_src plantuml :file /tmp/calicofx-pw-client-class-dig.png
   @startuml
@@ -104,7 +111,6 @@ Session manager is responsible to
         PLUGIN_TYPE_LV2
   }
   class PipewireClient{
-        -struct pw_thread_loop *loop
         -struct pw_filter *filter
         -PluginBase *pluginMgr
         +int pwInitClient(string uri, enum pluginType pluginType)
@@ -178,8 +184,16 @@ Initialization refers to the global initialization and is expected to be called 
 #+begin_src plantuml :file /tmp/calicofx-initialization.png :exports results
   @startuml
   participant "calicofx-core" as core
+  participant "pw-client" as pw
   participant "lv2-client" as lv2
 
+  core->pw:Initialize media sub-system
+  activate core
+        pw->pw:create main thread loop
+        pw->pw:create context from the main loop
+        pw->pw:connect context creating core
+        pw->core
+  deactivate core
   core->lv2:Initialize plugin
   activate core
         lv2->lv2:Initalize world (a.k.a create context)
