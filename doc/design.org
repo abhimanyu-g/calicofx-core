@@ -127,17 +127,17 @@ This class would solely be controlled by [[*pw-client][pw-client]]. Hence, there
 #+begin_src plantuml :file /tmp/calicofx-plugin-base-class-dig.png :exports results
   @startuml
   struct portDesc{
-  	string label
-  	uint8_t index
+        string label
+        uint8_t index
   }
 
   struct controlPortDesc {
-  	struct portDesc portInfo
-  	float def
-  	float max
-  	float min
-  	float val
-  	bool hasScalePoints
+        struct portDesc portInfo
+        float def
+        float max
+        float min
+        float val
+        bool hasScalePoints
   }
 
   class PluginBase{
@@ -145,7 +145,7 @@ This class would solely be controlled by [[*pw-client][pw-client]]. Hence, there
           +uint8_t nAudioInPorts
           +uint8_t nAudioOutPorts
           +uint8_t nControlPorts
-  	+vector <struct portDesc> audioInPortDesc
+        +vector <struct portDesc> audioInPortDesc
           +vector <struct portDesc> audioOutPortDesc
           +vector <struct controlPortDesc> controlPortDesc
           +virtual int pluginInit()= 0
@@ -164,13 +164,13 @@ Class responsible to manage lv2 specific operation. I.e,
 #+begin_src plantuml :file /tmp/calicofx-lv2-manager-class-dig.png :exports results
   @startuml
   class LV2Manager: public PluginBase{
-  	-string uri
-  	-LilvNode pluginUriNode
-  	-LilvNode pluginNode
-  	-LilvInstance *pluginInstance
-  	+int pluginInit() @override
-  	+int pluginActivate() @override
-  	+int pluginRun(int sampleRate) @override
+        -string uri
+        -LilvNode pluginUriNode
+        -LilvNode pluginNode
+        -LilvInstance *pluginInstance
+        +int pluginInit() @override
+        +int pluginActivate() @override
+        +int pluginRun(int sampleRate) @override
         +int pluginUpdateParam(uint8_t idx, float val) @override
   }
   @enduml
