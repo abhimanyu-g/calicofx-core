@@ -84,6 +84,7 @@ Session manager is responsible to
         CALICOFX_ADD_NODE
         CALICOFX_UPDATE_PARAM
         CALICOFX_LINK
+        CALICOFX_UNLINK
   }
   class SessionMgr{
         -clientMap <string uuid, Client pw-client>
@@ -117,12 +118,19 @@ Following are the common structures that are /file-static/ and share with all th
         +int pwInitClient(string uri, enum pluginType pluginType)
         +int pwUpdateClientParam(int clientPortIdx, float value)
         +static int pwLinkClientPorts(string srcNodeUUID, int srcPortIdx, string dstNodeUUID, int dstPortIdx)
+        +static int pwUnlinkClientPorts(string srcNodeUUID, int srcPortIdx, string dstNodeUUID, int dstPortIdx)
   }
   @enduml
 #+end_src
 **** ~pwLinkClientPorts~
 Links (a.k.a connects) the Source's output port to the Destination's input port. It utilizes the /impl/ APIs and calls [[https://docs.pipewire.org/group__pw__impl__link.html#ga7d7c433db2954a961e4980a37168dc6d][pw_context_create_link]] inside.
 It needs to be a static function (probably outside the class) as it operates on more than one pw-client
+
+**** ~pwUnlinkClientPorts~
+Unlinks (a.k.a disconnects) 2 ports.
+- Find the port using [[https://docs.pipewire.org/group__pw__impl__node.html#ga07267b71d5bbdf5312af836b240b4dab][pw_impl_node_find_port]] from the src/dst UUID and src/dst PortIdx. This works because we would have set ~port-id~ as the port-index from the plugin desc
+- Instead of storing the link structure, we would find it on the go using [[https://docs.pipewire.org/group__pw__impl__link.html#ga9dec6e3bcc59c5d9e7fb70bf36f86dd8][pw_impl_link_find]] passing the ports found in the previous step
+- Destroy it using [[https://docs.pipewire.org/group__pw__impl__link.html#ga3baed016411a9a3d0f7407c3a9144b39][pw_impl_link_destroy]]
 
 ** Plugin Base
 Plugin base is an abstract class which provides the interface to pipewire client class. This helps to interface various plugin types (vst, ladspa, clap...).
@@ -283,6 +291,26 @@ However, to establish a link between 2 ports, it is required that the /source po
   mgr->core
   core -> ui
   @enduml
+#+end_src
+
+** Unlink ports
+Unlinking refers to removing the previously established link between pw-clients
+#+begin_src plantuml :file /tmp/calicofx-unlink-ports.png :results output
+  participant "front-end" as ui
+  participant "calicofx-core" as core
+  participant "session-manager" as mgr
+  participant "pw-client" as pw
+  participant "lv2-client" as lv2
+
+  ui -> core : CALICOFX_UNLINK <srcUUID, srcPortIdx, dstUUID, dstPortIdx>
+  core -> mgr: sessionUnlinkNode (src, idx, dst, idx)
+  mgr -> mgr: get clients from UUID
+  mgr -> pw: pwUnlinkClientPorts (string srcNodeUUID, int srcPortIdx, string dstNodeUUID, int dstPortIdx)
+  pw -> pw: pw_impl_link_find (string srcNodeUUID, int srcPortIdx, string dstNodeUUID, int dstPortIdx)
+  pw -> pw: pw_impl_link_destroy (link)
+  pw -> mgr
+  mgr->core
+  core -> ui
 #+end_src
 
 ** De-initialize
