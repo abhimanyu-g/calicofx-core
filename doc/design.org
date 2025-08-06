@@ -77,6 +77,7 @@ Session manager is responsible to
 - Link/unlink between multiple nodes/pw-clients
 - Save and restore session ( > v1.0)
 
+There would always be utmost 1 Session manager instance
 #+name: SessionMgr
 #+begin_src plantuml :file /tmp/calicofx-session-mgr-class-dig.png
   @startuml
@@ -105,6 +106,7 @@ Following are the common structures that are /file-static/ and share with all th
 - ~pw_thread_loop *loop~
 - ~pw_context *context~
 - ~pw_core *core~
+
 *** class details
 #+name: PipewireClient
 #+begin_src plantuml :file /tmp/calicofx-pw-client-class-dig.png
@@ -122,6 +124,10 @@ Following are the common structures that are /file-static/ and share with all th
   }
   @enduml
 #+end_src
+**** ~pwInitClient~
+Init client initializes the pw-client and wraps the underlying plugin to provide a seamless abstraction to the above layers. The underlying plugin can be any of the supported types
+(refer [[*Plugin Base][Plugin Base]] and [[*Adding a node][Adding a node]] for more information).
+
 **** ~pwLinkClientPorts~
 Links (a.k.a connects) the Source's output port to the Destination's input port. It utilizes the /impl/ APIs and calls [[https://docs.pipewire.org/group__pw__impl__link.html#ga7d7c433db2954a961e4980a37168dc6d][pw_context_create_link]] inside.
 It needs to be a static function (probably outside the class) as it operates on more than one pw-client
@@ -176,7 +182,36 @@ Class responsible to manage lv2 specific operation. I.e,
 
 #+begin_src plantuml :file /tmp/calicofx-lv2-manager-class-dig.png :exports results
   @startuml
-  class LV2Manager: public PluginBase{
+  left to right direction
+    struct portDesc{
+        string label
+        uint8_t index
+  }
+
+  struct controlPortDesc {
+        struct portDesc portInfo
+        float def
+        float max
+        float min
+        float val
+        bool hasScalePoints
+  }
+
+  class PluginBase{
+          +string pluginName
+          +uint8_t nAudioInPorts
+          +uint8_t nAudioOutPorts
+          +uint8_t nControlPorts
+        +vector <struct portDesc> audioInPortDesc
+          +vector <struct portDesc> audioOutPortDesc
+          +vector <struct controlPortDesc> controlPortDesc
+          +virtual int pluginInit()= 0
+          +virtual int pluginActivate()= 0
+          +virtual int pluginRun(int sampleRate)= 0
+        +virtual int pluginUpdateParam(uint8_t idx, float val) = 0
+  }
+
+  class LV2Manager{
         -string uri
         -LilvNode pluginUriNode
         -LilvNode pluginNode
@@ -186,6 +221,13 @@ Class responsible to manage lv2 specific operation. I.e,
         +int pluginRun(int sampleRate) @override
         +int pluginUpdateParam(uint8_t idx, float val) @override
   }
+
+  LV2Manager ..|> PluginBase:Implements
+  controlPortDesc::portInfo ..> portDesc:Depends
+  PluginBase::audioInPortDesc ..> portDesc:Depends
+  PluginBase::audioOutPortDesc ..> portDesc:Depends
+  PluginBase::controlPortDesc ..> controlPortDesc:Depends
+
   @enduml
 #+end_src
 **** ~pluginUpdateParam~
