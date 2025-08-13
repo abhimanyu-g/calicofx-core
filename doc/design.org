@@ -112,7 +112,7 @@ Following are the common structures that are /file-static/ and share with all th
 During [[*De-initialize][De-initialize]], The above allocations are cleared
 - ~loop~ with [[https://docs.pipewire.org/group__pw__thread__loop.html#ga856c3aec5718bceb92d6169c42062186][pw_thread_loop_stop()]] and [[https://docs.pipewire.org/group__pw__thread__loop.html#ga58bf781b6f987e80d4a7a6796551dfb1][pw_thread_loop_destroy()]]
 - ~context~ with [[https://docs.pipewire.org/group__pw__context.html#ga41fdab6368603144f0911541182713a1][pw_context_destroy()]]
-- ~core~ with [[https://docs.pipewire.org/group__pw__core.html#gaa0ad30957ad355b5217f161cc7847c2f][pw_core_disconnect()]]   
+- ~core~ with [[https://docs.pipewire.org/group__pw__core.html#gaa0ad30957ad355b5217f161cc7847c2f][pw_core_disconnect()]]
 
 *** class details
 #+name: PipewireClient
@@ -202,7 +202,7 @@ Class responsible to manage lv2 specific operation. I.e,
 #+begin_src plantuml :file /tmp/calicofx-lv2-manager-class-dig.png :exports results
   @startuml
   left to right direction
-    struct portDesc{
+  struct portDesc{
         string label
         uint8_t index
   }
