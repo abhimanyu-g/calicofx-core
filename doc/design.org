@@ -96,6 +96,7 @@ There would always be utmost 1 Session manager instance
         +int sessionUpdateNodeParam(int paramIdx, float val)
         +int sessionLinkPort(string srcNodeUUID, int srcPortIdx, string dstNodeUUID, int dstPortIdx)
         +int sessionUnlinkNode(string srcNodeUUID, int srcPortIdx, string dstNodeUUID, int dstPortIdx)
+        ~SessionMgr()
   }
   @enduml
 #+end_src
@@ -107,6 +108,11 @@ Following are the common structures that are /file-static/ and share with all th
 - ~pw_thread_loop *loop~
 - ~pw_context *context~
 - ~pw_core *core~
+
+During [[*De-initialize][De-initialize]], The above allocations are cleared
+- ~loop~ with [[https://docs.pipewire.org/group__pw__thread__loop.html#ga856c3aec5718bceb92d6169c42062186][pw_thread_loop_stop()]] and [[https://docs.pipewire.org/group__pw__thread__loop.html#ga58bf781b6f987e80d4a7a6796551dfb1][pw_thread_loop_destroy()]]
+- ~context~ with [[https://docs.pipewire.org/group__pw__context.html#ga41fdab6368603144f0911541182713a1][pw_context_destroy()]]
+- ~core~ with [[https://docs.pipewire.org/group__pw__core.html#gaa0ad30957ad355b5217f161cc7847c2f][pw_core_disconnect()]]   
 
 *** class details
 #+name: PipewireClient
@@ -406,3 +412,35 @@ Unlinking refers to removing the previously established link between pw-clients
 
 
 ** De-initialize
+De-initialization is the final clean-up before closing the /calicofx/ application. It does opposite of what [[*Initialization][Initialization]] does. As /calicofx/ is planned to run as a service, De-initialization is triggered on receiving any system level signals (~SIGINT~ or ~SIGTERM~)
+#+begin_src plantuml :file /tmp/calicofx-de-initialization.png :exports results
+  @startuml
+  participant "calicofx-core" as core
+  participant "session-manager" as mgr
+  participant "pw-client" as pw
+  participant "lv2-client" as lv2
+
+  core->core: signal handler
+  core->mgr: delete session
+  activate mgr
+        loop pw-clients
+        mgr ->x pw: delete instance
+        pw ->x lv2: delete instance
+        mgr -> mgr: evit <<uuid>>
+        end
+        mgr -> core
+        destroy mgr
+        core -> pw: deinitialize
+  activate core
+        pw->pw:stop main thread loop
+        pw->pw:destroy main thread loop
+        pw->core
+  deactivate core
+  core->lv2:Deinitialize plugin
+  activate core
+        lv2->lv2:Deinitialize world (a.k.a delete context)
+        lv2->lv2:free all resources
+        lv2->core
+  deactivate core
+  @enduml
+#+end_src
