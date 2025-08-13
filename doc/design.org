@@ -86,6 +86,7 @@ There would always be utmost 1 Session manager instance
         CALICOFX_UPDATE_PARAM
         CALICOFX_LINK
         CALICOFX_UNLINK
+        CALICOFX_REMOVE_NODE
   }
   class SessionMgr{
         -clientMap <string uuid, Client pw-client>
@@ -121,9 +122,11 @@ Following are the common structures that are /file-static/ and share with all th
         +int pwUpdateClientParam(int clientPortIdx, float value)
         +static int pwLinkClientPorts(string srcNodeUUID, int srcPortIdx, string dstNodeUUID, int dstPortIdx)
         +static int pwUnlinkClientPorts(string srcNodeUUID, int srcPortIdx, string dstNodeUUID, int dstPortIdx)
+        +~PipewireClient()
   }
   @enduml
 #+end_src
+
 **** ~pwInitClient~
 Init client initializes the pw-client and wraps the underlying plugin to provide a seamless abstraction to the above layers. The underlying plugin can be any of the supported types
 (refer [[*Plugin Base][Plugin Base]] and [[*Adding a node][Adding a node]] for more information).
@@ -137,6 +140,13 @@ Unlinks (a.k.a disconnects) 2 ports.
 - Find the port using [[https://docs.pipewire.org/group__pw__impl__node.html#ga07267b71d5bbdf5312af836b240b4dab][pw_impl_node_find_port]] from the src/dst UUID and src/dst PortIdx. This works because we would have set ~port-id~ as the port-index from the plugin desc
 - Instead of storing the link structure, we would find it on the go using [[https://docs.pipewire.org/group__pw__impl__link.html#ga9dec6e3bcc59c5d9e7fb70bf36f86dd8][pw_impl_link_find]] passing the ports found in the previous step
 - Destroy it using [[https://docs.pipewire.org/group__pw__impl__link.html#ga3baed016411a9a3d0f7407c3a9144b39][pw_impl_link_destroy]]
+
+**** ~~PipewireClient~
+Destruct Pipewire client object and destroy underlying plugin instance and filter object
+- Calls base plugin's destruct function
+- Disconnects filter from the main-loop with [[https://docs.pipewire.org/group__pw__filter.html#ga913200b5d552335932cfe145bdf2a3e6][pw_filter_disconnect()]]
+- Destroys the filter with [[https://docs.pipewire.org/group__pw__filter.html#gaf54752a2edef1c569fdfb8e6774b4ead][pw_filter_destroy()]]
+**** TODO Adding process function
 
 ** Plugin Base
 Plugin base is an abstract class which provides the interface to pipewire client class. This helps to interface various plugin types (vst, ladspa, clap...).
@@ -171,9 +181,12 @@ This class would solely be controlled by [[*pw-client][pw-client]]. Hence, there
           +virtual int pluginActivate()= 0
           +virtual int pluginRun(int sampleRate)= 0
         +virtual int pluginUpdateParam(uint8_t idx, float val) = 0
+        +virtual int pluginDeactivate()=0
+        +virtual int pluginDestroy()=0
   }
   @enduml
 #+end_src
+
 *** LV2-manager
 Class responsible to manage lv2 specific operation. I.e,
 - Parsing the plugins to fetch plugin description (ports, number and type of controls, metadata etc...)
@@ -220,6 +233,8 @@ Class responsible to manage lv2 specific operation. I.e,
         +int pluginActivate() @override
         +int pluginRun(int sampleRate) @override
         +int pluginUpdateParam(uint8_t idx, float val) @override
+        +int pluginDeactivate() @override
+          +int pluginDestroy() @override
   }
 
   LV2Manager ..|> PluginBase:Implements
@@ -230,8 +245,12 @@ Class responsible to manage lv2 specific operation. I.e,
 
   @enduml
 #+end_src
+
 **** ~pluginUpdateParam~
  ~pluginUpdateParam~ will internally call [[https://drobilla.net/docs/lilv/index.html#c.lilv_instance_connect_port][lilv_instance_connect_port]] from the /lilv/ library to connect a control port of the current instance to a value and update it, therefore updating the plugin instance's port value.
+
+**** ~pluginDeactivate~ and ~pluginDestroy~
+Both are called at the termination of the [[*~~PipewireClient~][pw_client]]. ~pluginDeactivate~ for lv2 calls [[https://drobilla.net/docs/lilv/index.html#c.lilv_instance_deactivate][lilv_instance_deactivate()]] to deactivate the active instance of lv2 plugin and ~pluginDestroy~ calls [[https://drobilla.net/docs/lilv/index.html#c.lilv_instance_free][lilv_instance_free()]] to free the instance's resources.
 
 * Detailed flow
 ** Initialization
@@ -354,5 +373,36 @@ Unlinking refers to removing the previously established link between pw-clients
   mgr->core
   core -> ui
 #+end_src
+
+** Removing a node
+#+begin_src plantuml :file /tmp/calicofx-removing-a-node.png :results output
+  @startuml
+  participant "front-end" as ui
+  participant "calicofx-core" as core
+  participant "session-manager" as mgr
+  participant "pw-client" as pw
+  participant "lv2-client" as lv2
+
+  ui -> core : CALICOFX_REMOVE_NODE<uuid>
+  core -> mgr: sessionRemoveNode(string uuid)
+  mgr-> mgr: get node <<uuid>>
+  mgr -> pw: delete node
+  activate pw
+        pw->lv2: delete instance
+        activate lv2
+        lv2 -> lv2: pluginDeactivateInstance(instance)
+        lv2 -> lv2: pluginInstanceFree(instance)
+        lv2 --> pw
+        destroy lv2
+        pw -> pw: filter disconnect(filter)
+        pw -> pw: filter destroy(filter)
+        pw --> mgr
+        destroy pw
+        mgr -> mgr: evict <<uuid>>
+        mgr -> core: result
+        core -> ui:result
+  @enduml
+#+end_src
+
 
 ** De-initialize
