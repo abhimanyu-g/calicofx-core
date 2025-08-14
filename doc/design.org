@@ -152,7 +152,16 @@ Destruct Pipewire client object and destroy underlying plugin instance and filte
 - Calls base plugin's destruct function
 - Disconnects filter from the main-loop with [[https://docs.pipewire.org/group__pw__filter.html#ga913200b5d552335932cfe145bdf2a3e6][pw_filter_disconnect()]]
 - Destroys the filter with [[https://docs.pipewire.org/group__pw__filter.html#gaf54752a2edef1c569fdfb8e6774b4ead][pw_filter_destroy()]]
-**** TODO Adding process function
+
+**** Processing
+Apart from the above global variables, the [[https://docs.pipewire.org/structpw__filter__events.html#a324db3b12bbac07c495395eae521e97a][processing of plugin]] will be a common callback function. This is because all of the plugins have to perform following functionality in the sequence
+- Get ports with [[https://docs.pipewire.org/group__pw__filter.html#gaf86eb47b3adbca1ddfb66235a8a5ae69][pw_filter_get_dsp_buffer()]]. Do note that this only works as we register the node as a DSP media role
+- [[*~pluginConnectPort~][Connect the ports]] via Plugin Base and underlying plugin specific mechanism
+- Run the plugin instance with [[*~pluginRun~][pluginRun]]
+
+During the addition of ports, the port_ID of the pw_client was configured to be the same as the port's index of the plugin. The same shall be used to connect the ports.
+Also during the filter creation using [[https://docs.pipewire.org/group__pw__filter.html#gafff846bdbb4f52cac93f27a19c073e05][pw_filter_new_simple()]], an opaque pointer for the user data was passed. This user data is mostly a reference to /pluginMgr/ of the class. The same would be passed to process callback
+
 
 ** Plugin Base
 Plugin base is an abstract class which provides the interface to pipewire client class. This helps to interface various plugin types (vst, ladspa, clap...).
@@ -185,6 +194,7 @@ This class would solely be controlled by [[*pw-client][pw-client]]. Hence, there
           +vector <struct controlPortDesc> controlPortDesc
           +virtual int pluginInit()= 0
           +virtual int pluginActivate()= 0
+        +virtual int pluginConnectPort(uint8_t portIdx, float *buf) = 0
           +virtual int pluginRun(int sampleRate)= 0
         +virtual int pluginUpdateParam(uint8_t idx, float val) = 0
         +virtual int pluginDeactivate()=0
@@ -216,18 +226,22 @@ Class responsible to manage lv2 specific operation. I.e,
         bool hasScalePoints
   }
 
+
   class PluginBase{
           +string pluginName
           +uint8_t nAudioInPorts
           +uint8_t nAudioOutPorts
           +uint8_t nControlPorts
-        +vector <struct portDesc> audioInPortDesc
+          +vector <struct portDesc> audioInPortDesc
           +vector <struct portDesc> audioOutPortDesc
           +vector <struct controlPortDesc> controlPortDesc
           +virtual int pluginInit()= 0
           +virtual int pluginActivate()= 0
+          +virtual int pluginConnectPort(uint8_t portIdx, float *buf) = 0
           +virtual int pluginRun(int sampleRate)= 0
-        +virtual int pluginUpdateParam(uint8_t idx, float val) = 0
+          +virtual int pluginUpdateParam(uint8_t idx, float val) = 0
+          +virtual int pluginDeactivate()=0
+          +virtual int pluginDestroy()=0
   }
 
   class LV2Manager{
@@ -237,6 +251,7 @@ Class responsible to manage lv2 specific operation. I.e,
         -LilvInstance *pluginInstance
         +int pluginInit() @override
         +int pluginActivate() @override
+        +int pluginConnectPort(uint8_t portIdx, float *buf) @override
         +int pluginRun(int sampleRate) @override
         +int pluginUpdateParam(uint8_t idx, float val) @override
         +int pluginDeactivate() @override
@@ -258,6 +273,10 @@ Class responsible to manage lv2 specific operation. I.e,
 **** ~pluginDeactivate~ and ~pluginDestroy~
 Both are called at the termination of the [[*~~PipewireClient~][pw_client]]. ~pluginDeactivate~ for lv2 calls [[https://drobilla.net/docs/lilv/index.html#c.lilv_instance_deactivate][lilv_instance_deactivate()]] to deactivate the active instance of lv2 plugin and ~pluginDestroy~ calls [[https://drobilla.net/docs/lilv/index.html#c.lilv_instance_free][lilv_instance_free()]] to free the instance's resources.
 
+**** ~pluginConnectPort~
+pluginConnectPort tries to connect the shared buffer to the plugin's port. The lv2 class override of this function calls [[https://drobilla.net/docs/lilv/index.html#c.lilv_instance_connect_port][lilv_instance_connect_port()]] internally.
+**** ~pluginRun~
+Run an instance of the plugin using the call to [[https://drobilla.net/docs/lilv/index.html#c.lilv_instance_run][lilv_instance_run()]]. The process the input buffer according to the plugin's DSP and provides it at the output
 * Detailed flow
 ** Initialization
 Initialization refers to the global initialization and is expected to be called *only once* during the start of the program, there is also a [[*De-initialize][de-initialize]] counterpart which does the opposite
@@ -358,6 +377,25 @@ However, to establish a link between 2 ports, it is required that the /source po
   mgr->core
   core -> ui
   @enduml
+#+end_src
+
+** Processing audio
+Processing audio refers to handling the callback from the pipewire client. It involves connecting the input and output buffers to the appropriate ports of the underlying plugin and running the instance of that plugin to perform the intended audio effect on that input buffer and make the processed audio available on the output buffer.
+
+This is performed over and over all the plugin instances a.k.a pw-client nodes.
+
+Pipewire provides a [[https://docs.pipewire.org/structpw__filter__events.html#a324db3b12bbac07c495395eae521e97a][process]] callback feature that is called for each pw-client filter node.
+In each callback, the sequence of events looks like below.
+#+begin_src plantuml :file /tmp/calicofx-process-callback.png :results output
+  participant "pw-client" as pw
+  participant "lv2-client" as lv2
+
+  [o-> pw : process callback()
+  pw->pw : get io buffers as float buffer pointers
+  pw->pw : connect io buffers to underlying plugin ports
+  pw->lv2 : run plugin instance
+  lv2->pw
+  [<- pw
 #+end_src
 
 ** Unlink ports
