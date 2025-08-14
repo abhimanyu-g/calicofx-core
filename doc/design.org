@@ -96,6 +96,7 @@ There would always be utmost 1 Session manager instance
         +int sessionUpdateNodeParam(int paramIdx, float val)
         +int sessionLinkPort(string srcNodeUUID, int srcPortIdx, string dstNodeUUID, int dstPortIdx)
         +int sessionUnlinkNode(string srcNodeUUID, int srcPortIdx, string dstNodeUUID, int dstPortIdx)
+        SessionMgr()
         ~SessionMgr()
   }
   @enduml
@@ -283,22 +284,24 @@ Initialization refers to the global initialization and is expected to be called 
 #+begin_src plantuml :file /tmp/calicofx-initialization.png :exports results
   @startuml
   participant "calicofx-core" as core
+  participant "session-manager" as mgr
   participant "pw-client" as pw
   participant "lv2-client" as lv2
 
-  core->pw:Initialize media sub-system
-  activate core
-        pw->pw:create main thread loop
-        pw->pw:create context from the main loop
-        pw->pw:connect context creating core
-        pw->core
-  deactivate core
-  core->lv2:Initialize plugin
-  activate core
-        lv2->lv2:Initalize world (a.k.a create context)
-        lv2->lv2:Load all plugins
-        lv2->core
-  deactivate core
+  core->mgr: create Session
+  mgr->pw:Initialize media sub-system
+
+  pw->pw:create main thread loop
+  pw->pw:create context from the main loop
+  pw->pw:connect context creating core
+
+  pw->lv2:Initialize plugin
+  lv2->lv2:Initalize world (a.k.a create context)
+  lv2->lv2:Load all plugins
+  lv2->pw
+  pw->mgr
+  mgr->core
+
   @enduml
 #+end_src
 
