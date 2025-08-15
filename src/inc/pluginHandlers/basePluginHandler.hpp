@@ -1,21 +1,42 @@
 #ifndef BASEPLUGINHANDLER_H
 #define BASEPLUGINHANDLER_H
 
+#include <cstdint>
 #include <string>
+#include <vector>
 
-class BasePluginHandler
-{
-public:
-  virtual int pluginInit(std::string &pluginURI) = 0;
-  virtual int pluginActivateInstance() = 0;
-  virtual int pluginRun(int sampleRate) = 0;
-
-  // Adapter to connect to different port types
-  virtual int pluginConnectPort(int portIdx, float &var) = 0;
-  virtual int pluginConnectPort(int portIdx, int &var) = 0;
-  // BasePluginHandler();
-  // virtual ~BasePluginHandler() = default;
+struct portDesc {
+  std::string label;
+  uint8_t index;
 };
 
+struct controlPortDesc {
+  struct portDesc portInfo;
+  float def;
+  float max;
+  float min;
+  float val;
+  bool hasScalePoints;
+};
+
+class PluginBase {
+public:
+  std::string pluginName;
+  uint8_t nAudioInPorts;
+  uint8_t nAudioOutPorts;
+  uint8_t nControlPorts;
+  std::vector<struct portDesc> audioInPortDesc;
+  std::vector<struct portDesc> audioOutPortDesc;
+  std::vector<struct controlPortDesc> controlPortDesc;
+
+  // plugin prototypes ////////////////////////////////////////////////////////e
+  virtual int pluginInit(void* pluginURI) = 0;
+  virtual int pluginActivate() = 0;
+  virtual int pluginConnectPort(uint8_t portIdx, float *buf) = 0;
+  virtual int pluginRun(int sampleRate) = 0;
+  virtual int pluginUpdateParam(uint8_t idx, float val) = 0;
+  virtual int pluginDeactivate() = 0;
+  virtual int pluginDestroy() = 0;
+};
 
 #endif /* BASEPLUGINHANDLER_H */
