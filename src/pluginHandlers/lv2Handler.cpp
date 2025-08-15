@@ -18,17 +18,6 @@ static LilvNode *lilv_scale_point_class = nullptr;
 
 static vector<string> nodesURI;
 
-// LV2PluginHandler::~LV2PluginHandler() {
-//
-// };
-
-/**
- * @brief      Initialize Lv2 plugin handler
- * @details    The function is responsible to initialize
- *             the lv2 world and load all its plugins
- * @param      void
- * @return     < 0 for failure, 0 otherwise
- */
 int pluginLv2Initialize() {
   world = lilv_world_new();
   if (!world)
@@ -39,6 +28,8 @@ int pluginLv2Initialize() {
 
   // load all plugins from bundles
   plugins = (void *)lilv_world_get_all_plugins(world);
+  
+  // FIXME: Push this to a local database accessible from the UI 
   LILV_FOREACH(plugins, i, plugins) {
     const LilvPlugin *p = lilv_plugins_get(plugins, i);
     string node = string(lilv_node_as_uri(lilv_plugin_get_uri(p)));
@@ -54,11 +45,11 @@ int pluginLv2Initialize() {
   SYSLOG_DBG("LV2 plugin library initialized\n");
   return 0;
 }
+
 int pluginLv2Deinitalize() {
   // TODO: Have clean-up routine
   return 0;
 }
-
 
 
 void LV2PluginHandler::populatePorts(const LilvPlugin *plugin, uint8_t nPorts) {
@@ -126,103 +117,50 @@ void LV2PluginHandler::populatePorts(const LilvPlugin *plugin, uint8_t nPorts) {
   }
 }
 
-/**
- * @brief      Run plugin instance
- * @details    Processes connected buffers via (@ref pluginConnectPort)
- * @param      sampleRate: sampling rate chosen by the plugin manager
- * @return     0
- */
 int LV2PluginHandler::pluginRun( int sampleRate) {
-  lilv_instance_run(this->instance, sampleRate);
+  lilv_instance_run(this->pluginInstance, sampleRate);
   return 0;
 }
 
-int LV2PluginHandler::pluginConnectPort(int portIdx, float &var) {
+int LV2PluginHandler::pluginConnectPort(uint8_t portIdx, float *buf) {
   lilv_instance_connect_port
-    (this->instance, portIdx, &var);
+    (this->pluginInstance, portIdx, buf);
   return 0;
 }
 
-int LV2PluginHandler::pluginConnectPort(int portIdx, int &var) {
-  (void)portIdx;
-  (void)var;
+int LV2PluginHandler::pluginActivate() {
+  lilv_instance_activate(this->pluginInstance);
   return 0;
 }
 
-/**
- * @brief      Helper function to Activate plugin
- * @details    Activate plugin and start processing the data
- * @param      void
- * @return     void
- */
-int LV2PluginHandler::pluginActivateInstance() {
-  lilv_instance_activate(this->instance);
-  return 0;
-}
-
-/**
- * @brief      Initialize a plugin
- * @details    Initializes a LV2 plugin represented by URI
- * @param      URI : Unique identifier of the plugin
- * @return     0 on success, -ve otherwise
- */
-int LV2PluginHandler::pluginInit(std::string &URI) {
+int LV2PluginHandler::pluginInit(void *uri) {
   uint8_t nPorts = 0;
+  string lv2PluginURI = (const char*)uri;
   LilvNode *node;
-  LilvNode *pluginURI = lilv_new_uri(world, URI.c_str());
-  const LilvPlugin *plugin = lilv_plugins_get_by_uri(plugins, pluginURI);
+  pluginUriNode = lilv_new_uri(world, lv2PluginURI.c_str());
+  const LilvPlugin *plugin = lilv_plugins_get_by_uri(plugins, pluginUriNode);
 
   if (!plugin) {
-    SYSLOG_ERR("plugin URI [%s] not found\n", URI.c_str());
-    lilv_node_free(pluginURI);
+    SYSLOG_ERR("plugin URI [%s] not found\n", lv2PluginURI.c_str());
+    lilv_node_free(pluginUriNode);
     return -EAGAIN;
   }
 
-  node = lilv_plugin_get_name(plugin);
-  if (node) {
+  pluginNode = lilv_plugin_get_name(plugin);
+  if (pluginNode) {
     this->pluginName = string(lilv_node_as_string(node));
-    lilv_node_free(node);
+    lilv_node_free(pluginNode);
   }
 
   nPorts = lilv_plugin_get_num_ports(plugin);
   populatePorts(plugin, nPorts);
-  lilv_node_free(pluginURI);
+  lilv_node_free(pluginUriNode);
 
   return 0;
 }
 
-/**
- * @brief      Constructor
- * @details    Initializes lilvplugin library
- * @return     N/A
- */
-LV2PluginHandler::LV2PluginHandler() {
-  instance = nullptr;
-  nAudioInPorts = 0;
-  nAudioOutPorts = 0;
-  nControlPorts = 0;
+int LV2PluginHandler::pluginUpdateParam(uint8_t idx, float val) {return 0;}
 
-  pluginName = "";
-  audioInPortDesc.erase(audioInPortDesc.begin(), audioInPortDesc.end());
-  audioOutPortDesc.erase(audioOutPortDesc.begin(), audioOutPortDesc.end());
-  controlPortDesc.erase(controlPortDesc.begin(), controlPortDesc.end());
-}
+int LV2PluginHandler::pluginDeactivate() {return 0;}
 
-/**
- * @brief      Destructor
- * @details    Un-initializes lv2 plugin
- * @param      void
- * @return     N/A
- */
-LV2PluginHandler::~LV2PluginHandler() {
-  instance = nullptr;
-  nAudioInPorts = 0;
-  nAudioOutPorts = 0;
-  nControlPorts = 0;
-
-  pluginName = "";
-  audioInPortDesc.erase(audioInPortDesc.begin(), audioInPortDesc.end());
-  audioOutPortDesc.erase(audioOutPortDesc.begin(), audioOutPortDesc.end());
-  controlPortDesc.erase(controlPortDesc.begin(), controlPortDesc.end());
-  SYSLOG_DBG("Delete lv2 plugin instance");
-}
+int LV2PluginHandler::pluginDestroy() {return 0;}

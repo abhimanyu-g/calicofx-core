@@ -5,42 +5,33 @@
 
 #include "basePluginHandler.hpp"
 
-struct portDesc{
-  std::string label;
-  uint8_t index;
-};
-
-struct controlPortDesc{
-  struct portDesc portInfo;
-  float def, max, min, val;
-  bool hasScalePoints;
-};
-
 // Global initialize variable
+/**
+ * @brief      Initialize Lv2 plugin handler
+ * @details    The function is responsible to initialize
+ *             the lv2 world and load all its plugins
+ * @param      void
+ * @return     < 0 for failure, 0 otherwise
+ */
 int pluginLv2Initialize();
 int pluginLv2Deinitalize();
 
-class LV2PluginHandler:public BasePluginHandler{
-private:
-  LilvInstance *instance;
-  uint8_t nAudioInPorts, nAudioOutPorts, nControlPorts;
-  std::string pluginName;
-  std::vector<struct portDesc> audioInPortDesc, audioOutPortDesc;
-  std::vector<struct controlPortDesc> controlPortDesc;
-
-  // Private Prototypes
-  void populatePorts(const LilvPlugin *plugin, uint8_t nPorts);
-
-public:
-  int pluginInit(std::string &pluginURI) override;
-  int pluginActivateInstance() override;
+class LV2PluginHandler : public PluginBase {
+  
+public:      
+  int pluginInit(void *pluginURI) override;
+  int pluginActivate() override;
+  int pluginConnectPort(uint8_t portIdx, float *buf) override;
   int pluginRun(int sampleRate) override;
+  int pluginUpdateParam(uint8_t idx, float val) override;
+  int pluginDeactivate() override;
+  int pluginDestroy() override;
 
-  int pluginConnectPort(int portIdx, float &var) override;
-  int pluginConnectPort(int portIdx, int &var) override;
-
-  LV2PluginHandler();
-  ~LV2PluginHandler();
-
-  // TODO: Helper functions
+private:
+  std::string uri;
+  LilvNode *pluginUriNode;
+  LilvNode *pluginNode;
+  LilvInstance *pluginInstance;
+  void populatePorts(const LilvPlugin *plugin,
+                                       uint8_t nPorts);
 };
