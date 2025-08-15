@@ -4,7 +4,6 @@
 #include <syslog.h>
 #include <cstdarg>
 
-#define DEFAULT_SAMPLE_RATE (48000.0)
 
 #define SYSLOG_DBG(fmt, ...) Logger::log(LOG_DEBUG, fmt, ##__VA_ARGS__)
 #define SYSLOG_INF(fmt, ...) Logger::log(LOG_INFO, fmt, ##__VA_ARGS__)
@@ -12,11 +11,12 @@
 #define SYSLOG_ERR(fmt, ...) Logger::log(LOG_ERR, fmt, ##__VA_ARGS__)
 
 typedef enum ipcMessages {
-  IPC_CREATE_INSTANCE = 0,
-  IPC_CONNECT_PORTS,
-  IPC_DISCONNECT_PORTS,
-  IPC_UPDATE_CTRL_PARAM,
-  IPC_DELETE_INSTANCE
+  IPC_ADD_NODE,
+  IPC_UPDATE_PARAM,
+  IPC_LINK,
+  IPC_UNLINK,
+  IPC_REMOVE_NODE,
+  IPC_MAX
 } ipcMsg_t;
 
 class Logger {

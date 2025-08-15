@@ -1,7 +1,8 @@
 target_sources(calicofx
   PUBLIC main.cpp
   PUBLIC pw-client.cpp
-  PUBLIC logger.cpp)
+  PUBLIC logger.cpp
+  PUBLIC sessionMgr.cpp)
 
 target_include_directories(calicofx
   PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/inc
@@ -9,6 +10,5 @@ target_include_directories(calicofx
 
  target_link_libraries(calicofx
    pipewire-0.3)
-#   lilv-0)
 
 add_subdirectory(pluginHandlers)

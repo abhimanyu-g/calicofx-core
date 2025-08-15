@@ -1,24 +1,31 @@
-#include "common.hpp"
-#include "pw-client.hpp"
 #include <atomic>
 #include <thread>
 #include <unistd.h>
 
+#include "common.hpp"
+#include "config.hpp"
+#include "sessionMgr.hpp"
+
+
 std::atomic<bool> bExitIpcLoop(false);
-void ipcMsgHandler(void) {
-  ipcMsg_t ipcMsg = IPC_CREATE_INSTANCE;
+
+int main(void) {
+
+  Logger::init(FX_PROCESS_NAME);
+  SessionMgr session;
+
   while (!bExitIpcLoop) {
     // TODO: Handle messages here
-    switch (ipcMsg) {
-    case IPC_CREATE_INSTANCE:
+    switch (1) {
+    case IPC_ADD_NODE:
       break;
-    case IPC_CONNECT_PORTS:
+    case IPC_UPDATE_PARAM:
       break;
-    case IPC_DISCONNECT_PORTS:
+    case IPC_LINK:
       break;
-    case IPC_UPDATE_CTRL_PARAM:
+    case IPC_UNLINK:
       break;
-    case IPC_DELETE_INSTANCE:
+    case IPC_REMOVE_NODE:
       break;
     default:
       break;
@@ -26,19 +33,5 @@ void ipcMsgHandler(void) {
 
     sleep(200);
   }
-}
-
-int main(void) {
-  std::thread ipcHandler;
-  Logger::init("calicofx");
-  pwInitializeLib();
-
-  ipcHandler = std::thread(ipcMsgHandler);
-  pwRunMainLoop();
-
-  if (ipcHandler.joinable()) {
-    ipcHandler.join();
-  }
-  pwDeinitalizeLib();
   return 0;
 }
