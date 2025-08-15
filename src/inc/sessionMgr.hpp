@@ -1,35 +1,32 @@
 #pragma once
 
-#include "lv2PluginMgr.hpp"
+#include <string>
+#include <unordered_map>
+
 #include "pw-client.hpp"
 
-typedef struct node{
+enum ipcCommand {
+  CALICOFX_ADD_NODE = 0,
+  CALICOFX_UPDATE_PARAM,
+  CALICOFX_LINK,
+  CALICOFX_UNLINK,
+  CALICOFX_REMOVE_NODE
+};
 
-}node_t;
-
-/*
- *TODOs
- * - createNode with lv2 plugin and pw client
- * - deleteNode and free plugin and pw client instances
- * - connectPort srcPluginName:portName -> dstPluginName:portName
- * - disconnectPort srcPluginName:portName x-x dstPluginName:portName
- * - activateNode to activate the lv2 and pw client instances
- */
 class SessionMgr {
+
+public:
+  std::string sessionAddNode(std::string uri);
+  int sessionRemoveNode(std::string uuid);
+  int sessionUpdateNodeParam(int paramIdx, float val);
+  int sessionLinkPort(std::string srcNodeUUID, int srcPortIdx,
+                      std::string dstNodeUUID, int dstPortIdx);
+  int sessionUnlinkNode(std::string srcNodeUUID, int srcPortIdx,
+                        std::string dstNodeUUID, int dstPortIdx);
+  SessionMgr();
+  ~SessionMgr();
+
 private:
-  static bool initialized;
-  /////////////////////////////////////////////////////////////////////////////
-  //       Callbacks specific to the media layer (Pipewire, jack,...).       //
-  /////////////////////////////////////////////////////////////////////////////
-
-  // Pipewire Filter process cb ///////////////////////////////////////////////
-  static int process_cb(struct bufferDesc *buffDesc, void *userData);
-
-  public:
-    SessionMgr();
-    //  int initialize();
-    int createNode(const std::string &uid);
-    //int connectPort(const char *srcPort, const char *dstPort);
-    //int activateNode();
-    ~SessionMgr();
-  };
+  std::unordered_map<std::string, class PipeWireClient*> clientMap;
+  std::string generateUUID(void);
+};

@@ -1,33 +1,35 @@
 #include "common.hpp"
+#include "pw-client.hpp"
+#include <cassert>
 #include "sessionMgr.hpp"
 
 
-bool SessionMgr::initialized = false;
-
-int SessionMgr::process_cb(struct bufferDesc *buffDesc, void *userData) {return 0;}
+static bool initialized = false;
 
 SessionMgr::SessionMgr() {
   if (!initialized) {
-    // One time initializations
-    LV2PluginHandler::initalizeLv2Lib();
-    PipeWireClient::initializePwLib();
+    // One time initialization
+    assert(initializePwLib() == 0);
 
+    // TODO: restore old session if available
     initialized = true;
   }
 }
 
-int SessionMgr::createNode(const std::string &uid) {
-  LV2PluginHandler *p = new LV2PluginHandler(uid, DEFAULT_SAMPLE_RATE);
-  PipeWireClient *pw = new PipeWireClient(p->getPluginName(), (void*)p);
-
-  //  pw->registerProcessCb(SessionMgr::process_cb);
-  p->activateInstance();
-  return 0;
-}
-
 SessionMgr::~SessionMgr() {
   if (initialized) {
-    // TODO: Uninitialize
+    // TODO: store the current session to a file
+    teardownPwLib();
     initialized = false;
   }
 }
+
+std::string generateUUID(void){return "";}
+std::string SessionMgr::sessionAddNode(std::string uri){return "";}
+int SessionMgr::sessionRemoveNode(std::string uuid){return 0;}
+int SessionMgr::sessionUpdateNodeParam(int paramIdx, float val){return 0;}
+int SessionMgr::sessionLinkPort(std::string srcNodeUUID, int srcPortIdx,
+                      std::string dstNodeUUID, int dstPortIdx){return 0;}
+int SessionMgr::sessionUnlinkNode(std::string srcNodeUUID, int srcPortIdx,
+                        std::string dstNodeUUID, int dstPortIdx){return 0;}
+
