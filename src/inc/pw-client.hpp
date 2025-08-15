@@ -4,6 +4,7 @@
 #include <pipewire/pipewire.h>
 #include <pipewire/filter.h>
 
+#if 0
 struct bufferDesc{
   uint8_t nInputs;
   uint8_t nOuptputs;
@@ -64,4 +65,28 @@ public:
    */
   static int initializePwLib();
 
+};
+
+#endif
+// Platform setup and teardown ////////////////////////////////////////////////
+int initializePwLib();
+int teardownPwLib();
+
+enum pluginType { PLUGIN_TYPE_LV2 = 0 };
+
+class PipewireClient {
+private:
+  struct pw_filter *filter;
+  class PluginBase *pluginMgr;
+  
+public:
+  int pwInitClient(std::string uri, enum pluginType pluginType);
+  int pwUpdateClientParam(int clientPortIdx, float value);
+  static int pwLinkClientPorts(std::string srcNodeUUID, int srcPortIdx,
+                               std::string dstNodeUUID, int dstPortIdx);
+
+  static int pwUnlinkClientPorts(std::string srcNodeUUID, int srcPortIdx,
+                                 std::string dstNodeUUID, int dstPortIdx);
+    
+  ~PipewireClient();
 };

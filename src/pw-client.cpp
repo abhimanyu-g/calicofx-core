@@ -1,81 +1,75 @@
 #include "pw-client.hpp"
 #include "common.hpp"
+#include "config.hpp"
 #include "pipewire/context.h"
 #include "pipewire/core.h"
 #include "pipewire/filter.h"
 #include "pipewire/main-loop.h"
 #include "pipewire/pipewire.h"
 #include "pipewire/properties.h"
+#include "pipewire/thread-loop.h"
 #include "pluginHandlers/lv2Handler.hpp"
 
-static struct pw_main_loop *loop = nullptr;
+static struct pw_thread_loop *loop = nullptr;
 static struct pw_context *context = nullptr;
 static struct pw_core *core = nullptr;
 
-int pwInitializeLib() {
+int initializePwLib() {
   pw_init(0, NULL);
-  loop = pw_main_loop_new(NULL);
-  context = pw_context_new(pw_main_loop_get_loop(loop),
-                           NULL, 0);
+  loop = pw_thread_loop_new(FX_PROCESS_NAME, NULL);
+  context = pw_context_new(pw_thread_loop_get_loop(loop), NULL, 0);
   core = pw_context_connect(context, NULL, 0);
 
   // Initialize all plugin managers (LV2, VST...)  ////////////////////////////
   SYSLOG_DBG("Initializing plugin managers..\n");
+#ifdef PLUGIN_INCLUDE_LV2
   pluginLv2Initialize();
+#endif // PLUGIN_INCLUDE_LV2
 
   SYSLOG_DBG("Compiled with libpipewire %s\n"
              "Linked with libpipewire %s\n",
              pw_get_headers_version(), pw_get_library_version());
+
+  SYSLOG_INF("Starting pw main loop...");
+  pw_thread_loop_start(loop);
+
   return 0;
 }
 
-int pwDeinitalizeLib() {
+int teardownPwLib() {
+  // De-Initialize all plugin managers (LV2, VST...) //////////////////////////
+#ifdef PLUGIN_INCLUDE_LV2
+  pluginLv2Deinitalize();
+#endif // PLUGIN_INCLUDE_LV2
+
   pw_core_disconnect(core);
   pw_context_destroy(context);
-  pw_main_loop_destroy(loop);
+  pw_thread_loop_stop(loop);
+  pw_thread_loop_destroy(loop);
   pw_deinit();
 
-  // De-Initialize all plugin managers (LV2, VST...) //////////////////////////
-  pluginLv2Deinitalize();
-
-  return 0;
-}
-
-
-void pwRunMainLoop() {
-  SYSLOG_DBG("Starting pipewire main-loop\n");
-
-  // Blocking call to process all pipewire events
-  pw_main_loop_run(loop);
-}
-
-int pwActionDispatchHandler(action_t dispatchAction, void *payload) {
-  (void)payload;
-  switch (dispatchAction) {
-  case ACTION_CREATE_INSTANCE:
-    break;
-  case ACTION_CONNECT_PORTS:
-    break;
-  case ACTION_DISCONNECT_PORTS:
-    break;
-  case ACTION_UPDATE_CTRL_PARAM:
-    break;
-  case ACTION_DELETE_INSTANCE:
-    break;
-  default:
-    break;
-  }
   return 0;
 }
 
 // Functionality to be updated ////////////////////////////////////////////////
-void PipeWireClient::on_process(void *userdata,
+static void on_process(void *userdata,
                                 struct spa_io_position *position) {
-  struct bufferDesc desc = {};
+//  struct bufferDesc desc = {};
   // if (!runProcessCb)
   //   return;
 }
 
+int PipewireClient::pwInitClient(std::string uri, enum pluginType pluginType){return 0;}
+int PipewireClient::pwUpdateClientParam(int clientPortIdx, float value){return 0;}
+int PipewireClient::pwLinkClientPorts(std::string srcNodeUUID, int srcPortIdx,
+                                      std::string dstNodeUUID, int dstPortIdx){return 0;}
+
+int PipewireClient::pwUnlinkClientPorts(std::string srcNodeUUID, int srcPortIdx,
+                                        std::string dstNodeUUID, int dstPortIdx){return 0;}
+
+PipewireClient::~PipewireClient(){}
+
+#if 0
 PipeWireClient::PipeWireClient(const std::string &name, void *userData) {
   struct pw_filter_events events = {
       PW_VERSION_FILTER_EVENTS,
@@ -89,3 +83,4 @@ PipeWireClient::PipeWireClient(const std::string &name, void *userData) {
                         NULL),
       &events, userData);
 }
+#endif
