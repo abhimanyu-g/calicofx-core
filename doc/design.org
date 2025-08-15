@@ -82,11 +82,11 @@ There would always be utmost 1 Session manager instance
 #+begin_src plantuml :file /tmp/calicofx-session-mgr-class-dig.png
   @startuml
   enum ipcCommand{
-        CALICOFX_ADD_NODE
-        CALICOFX_UPDATE_PARAM
-        CALICOFX_LINK
-        CALICOFX_UNLINK
-        CALICOFX_REMOVE_NODE
+        IPC_ADD_NODE
+        IPC_UPDATE_PARAM
+        IPC_LINK
+        IPC_UNLINK
+        IPC_REMOVE_NODE
   }
   class SessionMgr{
         -clientMap <string uuid, Client pw-client>
@@ -193,7 +193,7 @@ This class would solely be controlled by [[*pw-client][pw-client]]. Hence, there
         +vector <struct portDesc> audioInPortDesc
           +vector <struct portDesc> audioOutPortDesc
           +vector <struct controlPortDesc> controlPortDesc
-          +virtual int pluginInit()= 0
+          +virtual int pluginInit(void* uri)= 0
           +virtual int pluginActivate()= 0
         +virtual int pluginConnectPort(uint8_t portIdx, float *buf) = 0
           +virtual int pluginRun(int sampleRate)= 0
@@ -247,10 +247,10 @@ Class responsible to manage lv2 specific operation. I.e,
 
   class LV2Manager{
         -string uri
-        -LilvNode pluginUriNode
-        -LilvNode pluginNode
+        -LilvNode *pluginUriNode
+        -LilvNode *pluginNode
         -LilvInstance *pluginInstance
-        +int pluginInit() @override
+        +int pluginInit(void* uri) @override
         +int pluginActivate() @override
         +int pluginConnectPort(uint8_t portIdx, float *buf) @override
         +int pluginRun(int sampleRate) @override
