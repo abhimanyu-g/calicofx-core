@@ -1,8 +1,9 @@
 #pragma once
-#include <vector>
-#include <string>
-#include <pipewire/pipewire.h>
+#include "pluginHandlers/basePluginHandler.hpp"
 #include <pipewire/filter.h>
+#include <pipewire/pipewire.h>
+#include <string>
+#include <vector>
 
 #if 0
 struct bufferDesc{
@@ -74,11 +75,11 @@ int teardownPwLib();
 
 enum pluginType { PLUGIN_TYPE_LV2 = 0 };
 
+struct pwUserPortDesc {
+  int pluginPortIdx;
+};
+
 class PipewireClient {
-private:
-  struct pw_filter *filter;
-  class PluginBase *pluginMgr;
-  
 public:
   int pwInitClient(std::string uri, enum pluginType pluginType);
   int pwUpdateClientParam(int clientPortIdx, float value);
@@ -87,6 +88,16 @@ public:
 
   static int pwUnlinkClientPorts(std::string srcNodeUUID, int srcPortIdx,
                                  std::string dstNodeUUID, int dstPortIdx);
-    
+
+  void *getPluginMgr();
+  void *getFilterNode();
+  std::vector<struct pwUserPortDesc *> &getPwPortDescList();
   ~PipewireClient();
+
+private:
+  struct pw_filter *filter;
+  class PluginBase *pluginMgr;
+  std::vector<struct pwUserPortDesc *> userPortDescList;
+  int pwAddInputPorts();
+  int pwAddOutputPorts();
 };
