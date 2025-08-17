@@ -28,10 +28,7 @@ public:
   int pluginDestroy() override;
 
 private:
-  std::string uri;
-  LilvNode *pluginUriNode;
-  LilvNode *pluginNode;
+  std::string pluginURI;
   LilvInstance *pluginInstance;
-  void populatePorts(const LilvPlugin *plugin,
-                                       uint8_t nPorts);
+  void populatePorts(const LilvPlugin *plugin);
 };

@@ -1,9 +1,11 @@
 #include <errno.h>
+#include <lilv/lilv.h>
 #include <limits>
 #include <vector>
 
 #include "common.hpp"
-#include "lilv/lilv.h"
+#include "config.hpp"
+#include "pluginHandlers/basePluginHandler.hpp"
 #include "pluginHandlers/lv2Handler.hpp"
 
 using namespace std;
@@ -28,8 +30,8 @@ int pluginLv2Initialize() {
 
   // load all plugins from bundles
   plugins = (void *)lilv_world_get_all_plugins(world);
-  
-  // FIXME: Push this to a local database accessible from the UI 
+
+  // FIXME: Push this to a local database accessible from the UI
   LILV_FOREACH(plugins, i, plugins) {
     const LilvPlugin *p = lilv_plugins_get(plugins, i);
     string node = string(lilv_node_as_uri(lilv_plugin_get_uri(p)));
@@ -47,25 +49,33 @@ int pluginLv2Initialize() {
 }
 
 int pluginLv2Deinitalize() {
-  // TODO: Have clean-up routine
+  lilv_node_free(lilv_audio_class);
+  lilv_node_free(lilv_input_class);
+  lilv_node_free(lilv_output_class);
+  lilv_node_free(lilv_control_class);
+  lilv_node_free(lilv_scale_point_class);
+
+  lilv_world_free(world);
+  SYSLOG_DBG("LV2 plugin library de-initialized\n");
   return 0;
 }
 
-
-void LV2PluginHandler::populatePorts(const LilvPlugin *plugin, uint8_t nPorts) {
+void LV2PluginHandler::populatePorts(const LilvPlugin *plugin) {
+  int nPorts = -1;
   nAudioInPorts = 0;
   nAudioOutPorts = 0;
   nControlPorts = 0;
 
+  nPorts = lilv_plugin_get_num_ports(plugin);
   for (uint8_t idx = 0; idx < nPorts; ++idx) {
     // nPorts would always have [0...nPorts] sequentially
     struct portDesc desc = {};
-    struct controlPortDesc ctrlPortDesc = {};
     const LilvPort *port = lilv_plugin_get_port_by_index(plugin, idx);
-    LilvNode *portName = lilv_port_get_name(plugin, port);
+    LilvNode *portNameNode = lilv_port_get_name(plugin, port);
 
-    desc.label = string(lilv_node_as_string(portName));
+    desc.label = string(lilv_node_as_string(portNameNode));
     desc.index = idx;
+    lilv_node_free(portNameNode);
 
     // audio ports
     if (lilv_port_is_a(plugin, port, lilv_audio_class)) {
@@ -80,17 +90,17 @@ void LV2PluginHandler::populatePorts(const LilvPlugin *plugin, uint8_t nPorts) {
       }
     }
 
-      // control ports
+    // control ports
     else if (lilv_port_is_a(plugin, port, lilv_control_class)) {
       LilvNode *def, *min, *max;
       LilvScalePoints *sp;
+      struct controlPortDesc ctrlPortDesc = {};
 
       ctrlPortDesc.portInfo = desc;
       ctrlPortDesc.def = ctrlPortDesc.min = ctrlPortDesc.max =
-        ctrlPortDesc.val = numeric_limits<float>::max();
+          ctrlPortDesc.val = numeric_limits<float>::max();
       ctrlPortDesc.hasScalePoints = false;
 
-      this->nControlPorts++;
       lilv_port_get_range(plugin, port, &def, &min, &max);
 
       if (def) {
@@ -106,25 +116,45 @@ void LV2PluginHandler::populatePorts(const LilvPlugin *plugin, uint8_t nPorts) {
         lilv_node_free(max);
       }
 
+      ctrlPortDesc.val = ctrlPortDesc.def;
       sp = lilv_port_get_scale_points(plugin, port);
       if (sp) {
         ctrlPortDesc.hasScalePoints = true;
-        // TODO: Parse and add scale points
+
+        LILV_FOREACH(scale_points, spNode, sp) {
+          struct scalePointsDesc scalePointDesc;
+          const LilvScalePoint *pScalePoint = lilv_scale_points_get(sp, spNode);
+
+          const LilvNode *pScalePointLabelNode =
+              lilv_scale_point_get_label(pScalePoint);
+          scalePointDesc.label =
+              string(lilv_node_as_string(pScalePointLabelNode));
+
+          const LilvNode *pScalePointValNode =
+              lilv_scale_point_get_value(pScalePoint);
+          scalePointDesc.val = lilv_node_as_float(pScalePointValNode);
+
+          ctrlPortDesc.scalePoints.push_back(scalePointDesc);
+        }
         lilv_scale_points_free(sp);
       }
+
+      SYSLOG_DBG("configuring control port at idx [%d]\n",
+                 ctrlPortDesc.portInfo.index);
+      pluginConnectPort(ctrlPortDesc.portInfo.index, &ctrlPortDesc.val);
+      controlPortDesc.push_back(ctrlPortDesc);
+      nControlPorts++;
     }
-    lilv_node_free(portName);
   }
 }
 
-int LV2PluginHandler::pluginRun( int sampleRate) {
-  lilv_instance_run(this->pluginInstance, sampleRate);
+int LV2PluginHandler::pluginRun(int nSamples) {
+  lilv_instance_run(this->pluginInstance, nSamples);
   return 0;
 }
 
 int LV2PluginHandler::pluginConnectPort(uint8_t portIdx, float *buf) {
-  lilv_instance_connect_port
-    (this->pluginInstance, portIdx, buf);
+  lilv_instance_connect_port(this->pluginInstance, portIdx, buf);
   return 0;
 }
 
@@ -134,33 +164,53 @@ int LV2PluginHandler::pluginActivate() {
 }
 
 int LV2PluginHandler::pluginInit(void *uri) {
-  uint8_t nPorts = 0;
-  string lv2PluginURI = (const char*)uri;
-  LilvNode *node;
-  pluginUriNode = lilv_new_uri(world, lv2PluginURI.c_str());
-  const LilvPlugin *plugin = lilv_plugins_get_by_uri(plugins, pluginUriNode);
+  LilvNode *pluginNode = nullptr, *pluginUriNode = nullptr;
+  LilvPlugin *plugin = nullptr;
 
+  if (!uri) {
+    SYSLOG_ERR("Invalid usage. LV2 plugin URI required.\n");
+    return -EINVAL;
+  }
+
+  pluginURI = (const char *)uri;
+  pluginUriNode = lilv_new_uri(world, pluginURI.c_str());
+
+  plugin = (LilvPlugin *)lilv_plugins_get_by_uri(plugins, pluginUriNode);
   if (!plugin) {
-    SYSLOG_ERR("plugin URI [%s] not found\n", lv2PluginURI.c_str());
+    SYSLOG_ERR("plugin URI [%s] not found\n", pluginURI.c_str());
     lilv_node_free(pluginUriNode);
     return -EAGAIN;
   }
+  lilv_node_free(pluginUriNode);
 
   pluginNode = lilv_plugin_get_name(plugin);
   if (pluginNode) {
-    this->pluginName = string(lilv_node_as_string(node));
+    pluginName = string(lilv_node_as_string(pluginNode));
     lilv_node_free(pluginNode);
   }
 
-  nPorts = lilv_plugin_get_num_ports(plugin);
-  populatePorts(plugin, nPorts);
-  lilv_node_free(pluginUriNode);
+  // Instantiate plugin
+  pluginInstance = lilv_plugin_instantiate(plugin, DEFAULT_SAMPLE_RATE, NULL);
+  if (!pluginInstance) {
+    SYSLOG_ERR("Failed to instantiate plugin [%s]. Try again\n",
+               pluginName.c_str());
+    return -EAGAIN;
+  }
 
+  populatePorts(plugin);
+  SYSLOG_DBG("Added plugin [%s] successfully\n", pluginName.c_str());
   return 0;
 }
 
-int LV2PluginHandler::pluginUpdateParam(uint8_t idx, float val) {return 0;}
+int LV2PluginHandler::pluginUpdateParam(uint8_t idx, float val) { return 0; }
 
-int LV2PluginHandler::pluginDeactivate() {return 0;}
+int LV2PluginHandler::pluginDeactivate() {
+  lilv_instance_deactivate(pluginInstance);
+  return 0;
+}
 
-int LV2PluginHandler::pluginDestroy() {return 0;}
+int LV2PluginHandler::pluginDestroy() {
+  lilv_instance_free(pluginInstance);
+  ;
+  return 0;
+}

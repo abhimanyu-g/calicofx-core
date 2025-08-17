@@ -10,6 +10,11 @@ struct portDesc {
   uint8_t index;
 };
 
+struct scalePointsDesc {
+  std::string label;
+  float val;
+};
+
 struct controlPortDesc {
   struct portDesc portInfo;
   float def;
@@ -17,6 +22,7 @@ struct controlPortDesc {
   float min;
   float val;
   bool hasScalePoints;
+  std::vector<struct scalePointsDesc> scalePoints;
 };
 
 class PluginBase {
@@ -33,7 +39,7 @@ public:
   virtual int pluginInit(void* pluginURI) = 0;
   virtual int pluginActivate() = 0;
   virtual int pluginConnectPort(uint8_t portIdx, float *buf) = 0;
-  virtual int pluginRun(int sampleRate) = 0;
+  virtual int pluginRun(int nSamples) = 0;
   virtual int pluginUpdateParam(uint8_t idx, float val) = 0;
   virtual int pluginDeactivate() = 0;
   virtual int pluginDestroy() = 0;
