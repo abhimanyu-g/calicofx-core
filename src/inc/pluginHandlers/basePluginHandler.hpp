@@ -33,12 +33,13 @@ public:
   uint8_t nControlPorts;
   std::vector<struct portDesc> audioInPortDesc;
   std::vector<struct portDesc> audioOutPortDesc;
+  std::vector<struct portDesc> midiPortDesc;
   std::vector<struct controlPortDesc> controlPortDesc;
 
   // plugin prototypes ////////////////////////////////////////////////////////e
-  virtual int pluginInit(void* pluginURI) = 0;
+  virtual int pluginInit(void *pluginURI) = 0;
   virtual int pluginActivate() = 0;
-  virtual int pluginConnectPort(uint8_t portIdx, float *buf) = 0;
+  virtual int pluginConnectPort(uint8_t portIdx, void *buf) = 0;
   virtual int pluginRun(int nSamples) = 0;
   virtual int pluginUpdateParam(uint8_t idx, float val) = 0;
   virtual int pluginDeactivate() = 0;
