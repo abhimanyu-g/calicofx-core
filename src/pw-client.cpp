@@ -15,7 +15,7 @@
 #include "pipewire/context.h"
 #include "pipewire/thread-loop.h"
 #include "pluginHandlers/basePluginHandler.hpp"
-#include "pluginHandlers/lv2Handler.hpp"
+#include "pluginHandlers/lv2/lv2Handler.hpp"
 #include "spa/param/latency.h"
 #include "spa/utils/defs.h"
 
@@ -80,7 +80,7 @@ static void on_process(void *userData, struct spa_io_position *position) {
   }
 
   plugin->pluginRun(nSamples);
-  // SYSLOG_DBG("processing done\n");
+  SYSLOG_DBG("processing done\n");
 }
 
 void *PipewireClient::getPluginMgr() { return (void *)pluginMgr; }
@@ -171,7 +171,8 @@ int PipewireClient::pwInitClient(std::string uri, enum pluginType pluginType) {
   pwAddInputPorts();
   pwAddOutputPorts();
 
-  spaLatInfo.ns = 10 * SPA_NSEC_PER_MSEC;
+  //  spaLatInfo.ns = 10 * SPA_NSEC_PER_MSEC;
+  spaLatInfo.quantum = (float)DEFAULT_MAX_BLOCK_LEN;
   params[0] = spa_process_latency_build(&spaBuilder, SPA_PARAM_ProcessLatency,
                                         &spaLatInfo);
 
