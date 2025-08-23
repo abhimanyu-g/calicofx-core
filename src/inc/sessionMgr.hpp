@@ -19,14 +19,14 @@ public:
   std::string sessionAddNode(std::string uri);
   int sessionRemoveNode(std::string uuid);
   int sessionUpdateNodeParam(int paramIdx, float val);
-  int sessionLinkPort(std::string srcNodeUUID, int srcPortIdx,
-                      std::string dstNodeUUID, int dstPortIdx);
-  int sessionUnlinkNode(std::string srcNodeUUID, int srcPortIdx,
-                        std::string dstNodeUUID, int dstPortIdx);
+  int sessionLinkPort(std::string srcNodeName, std::string srcPortName,
+                      std::string dstNodeName, std::string dstPortName);
+  int sessionUnlinkPort(std::string srcNodeName, std::string srcPortName,
+                        std::string dstNodeName, std::string dstPortName);
   SessionMgr();
   ~SessionMgr();
 
 private:
-  std::unordered_map<std::string, class PipeWireClient*> clientMap;
+  std::unordered_map<std::string, class PipeWireClient *> clientMap;
   std::string generateUUID(void);
 };

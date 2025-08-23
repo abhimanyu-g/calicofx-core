@@ -32,8 +32,20 @@ std::string SessionMgr::sessionAddNode(std::string uri) {
 }
 int SessionMgr::sessionRemoveNode(std::string uuid){return 0;}
 int SessionMgr::sessionUpdateNodeParam(int paramIdx, float val){return 0;}
-int SessionMgr::sessionLinkPort(std::string srcNodeUUID, int srcPortIdx,
-                      std::string dstNodeUUID, int dstPortIdx){return 0;}
-int SessionMgr::sessionUnlinkNode(std::string srcNodeUUID, int srcPortIdx,
-                        std::string dstNodeUUID, int dstPortIdx){return 0;}
+int SessionMgr::sessionLinkPort(std::string srcNodeName,
+                                std::string srcPortName,
+                                std::string dstNodeName,
+                                std::string dstPortName) {
+  return PipewireClient::pwLinkClientPorts(srcNodeName, srcPortName,
+                                           dstNodeName, dstPortName);
+}
+
+int SessionMgr::sessionUnlinkPort(std::string srcNodeName,
+                                  std::string srcPortName,
+                                  std::string dstNodeName,
+                                  std::string dstPortName) {
+  return PipewireClient::pwUnlinkClientPorts(srcNodeName, srcPortName,
+                                             dstNodeName, dstPortName);
+}
+
 

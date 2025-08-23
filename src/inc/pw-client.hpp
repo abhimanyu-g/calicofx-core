@@ -81,13 +81,17 @@ struct pwUserPortDesc {
 
 class PipewireClient {
 public:
+  std::string filterNodeName;
   int pwInitClient(std::string uri, enum pluginType pluginType);
   int pwUpdateClientParam(int clientPortIdx, float value);
-  static int pwLinkClientPorts(std::string srcNodeUUID, int srcPortIdx,
-                               std::string dstNodeUUID, int dstPortIdx);
+  static int pwLinkClientPorts(std::string srcNodeName, std::string srcPortName,
+                               std::string dstNodeName,
+                               std::string dstPortName);
 
-  static int pwUnlinkClientPorts(std::string srcNodeUUID, int srcPortIdx,
-                                 std::string dstNodeUUID, int dstPortIdx);
+  static int pwUnlinkClientPorts(std::string srcNodeName,
+                                 std::string srcPortName,
+                                 std::string dstNodeName,
+                                 std::string dstPortName);
 
   void *getPluginMgr();
   void *getFilterNode();
