@@ -18,7 +18,7 @@ class SessionMgr {
 public:
   std::string sessionAddNode(std::string uri);
   int sessionRemoveNode(std::string uuid);
-  int sessionUpdateNodeParam(int paramIdx, float val);
+  int sessionUpdateNodeParam(std::string nodeName, int paramIdx, float val);
   int sessionLinkPort(std::string srcNodeName, std::string srcPortName,
                       std::string dstNodeName, std::string dstPortName);
   int sessionUnlinkPort(std::string srcNodeName, std::string srcPortName,

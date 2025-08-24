@@ -44,14 +44,14 @@ static const int32_t pluginSeqBufLen = DEFAULT_SEQ_BUF_SIZE;
 //                          Host supported features                          //
 ///////////////////////////////////////////////////////////////////////////////
 
-// Unordered Map///////////////////////////////////////////////////////////////
+// Map///////////////////////////////////////////////////////////////
 static LV2_URID nextURID = 1;
 static std::unordered_map<std::string, LV2_URID> uridMap;
 LV2_URID lv2_urid_map(LV2_URID_Map_Handle handle, const char *uri);
 LV2_URID_Map pluginUridMapDesc = {NULL, lv2_urid_map};
 LV2_Feature pluginFeatMapUrid = {LV2_URID__map, &pluginUridMapDesc};
 
-// Ordered Map ////////////////////////////////////////////////////////////////
+// UnMap ////////////////////////////////////////////////////////////////
 static std::unordered_map<LV2_URID, std::string> uridUnmap;
 const char *lv2_urid_unmap(LV2_URID_Unmap_Handle, const LV2_URID urid);
 LV2_URID_Unmap pluginUridUnmapDesc = {NULL, lv2_urid_unmap};
@@ -259,6 +259,7 @@ int LV2PluginHandler::pluginRun(int nSamples) {
   if (pWorkerHdl) {
     pWorkerHdl->workerJobResponse();
   }
+  // TODO: Send MIDI buffers
   return 0;
 }
 
@@ -331,7 +332,20 @@ int LV2PluginHandler::pluginInit(void *uri) {
   return 0;
 }
 
-int LV2PluginHandler::pluginUpdateParam(uint8_t idx, float val) { return 0; }
+int LV2PluginHandler::pluginUpdateParam(uint8_t idx, float val) {
+  for (struct controlPortDesc &ctrlPort : controlPortDesc) {
+    if (ctrlPort.portInfo.index == idx) {
+      if (ctrlPort.min < ctrlPort.max &&
+          (val < ctrlPort.min || val > ctrlPort.max)) {
+        return -EINVAL;
+      }
+      ctrlPort.val = val;
+      break;
+    }
+  }
+  return 0;
+}
+
 
 int LV2PluginHandler::pluginDeactivate() {
   lilv_instance_deactivate(pluginInstance);

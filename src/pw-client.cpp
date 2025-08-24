@@ -283,6 +283,7 @@ int PipewireClient::pwInitClient(std::string uri, enum pluginType pluginType) {
 }
 
 int PipewireClient::pwUpdateClientParam(int clientPortIdx, float value) {
+  pluginMgr->pluginUpdateParam(clientPortIdx, value);
   return 0;
 }
 
