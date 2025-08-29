@@ -95,6 +95,7 @@ int teardownPwLib() {
   pluginLv2Deinitalize();
 #endif // PLUGIN_INCLUDE_LV2
 
+  // pw_thread_loop_lock(loop);
   pw_core_disconnect(core);
   pw_context_destroy(context);
   pw_thread_loop_stop(loop);
@@ -172,7 +173,7 @@ static void on_process(void *userData, struct spa_io_position *position) {
   }
 
   plugin->pluginRun(nSamples);
-//  SYSLOG_DBG("processing done\n");
+  //  SYSLOG_DBG("processing done\n");
 }
 
 void *PipewireClient::getPluginMgr() { return (void *)pluginMgr; }
@@ -395,6 +396,37 @@ return_status:
 }
 
 PipewireClient::~PipewireClient() {
+  std::string nodeID = "";
+
   pluginMgr->pluginDeactivate();
+  pluginMgr->pluginDestroy();
+  delete pluginMgr;
+
+  for (auto it = nodeGraph.begin(); it != nodeGraph.end(); it++) {
+    struct clientNodeDesc *nodeDesc = &it->second;
+    if (nodeDesc->label == filterNodeName) {
+      nodeID = nodeDesc->id;
+      break;
+    }
+  }
+
+  // Evict any links that might exist
+  for (auto it = linkList.begin(); it != linkList.end(); it++) {
+    struct clientLinkDesc *pLinkDesc = &(*it);
+    if (pLinkDesc->srcNodeId == nodeID || pLinkDesc->dstNodeId == nodeID) {
+      linkList.erase(it);
+    }
+  }
+
+  // Evict client from the graph
+  struct clientNodeDesc *nodeDesc = &nodeGraph[nodeID];
+  for (std::string &portID : nodeDesc->portIDs) {
+    nodeGraph.erase(nodeGraph.find(portID));
+  }
+  nodeGraph.erase(nodeGraph.find(nodeID));
+
+  pw_thread_loop_lock(loop);
+  pw_filter_disconnect(filter);
   pw_filter_destroy(filter);
+  pw_thread_loop_unlock(loop);
 }

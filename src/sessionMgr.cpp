@@ -20,13 +20,15 @@ SessionMgr::SessionMgr() {
 SessionMgr::~SessionMgr() {
   if (initialized) {
     // TODO: store the current session to a file
-    teardownPwLib();
     for (auto it = sessionNodesMap.begin(); it != sessionNodesMap.end(); it++) {
       PipewireClient *pClient = it->second;
       if (pClient)
         delete pClient;
-      sessionNodesMap.erase(it);
+      // sessionNodesMap.erase(it);
     }
+
+    teardownPwLib();
+
     initialized = false;
   }
 }
@@ -35,10 +37,25 @@ std::string SessionMgr::sessionAddNode(std::string uri) {
   PipewireClient *pClient = new PipewireClient();
   pClient->pwInitClient(uri, PLUGIN_TYPE_LV2);
   sessionNodesMap[pClient->filterNodeName] = pClient;
-  return "";
+  return pClient->filterNodeName;
 }
 
-int SessionMgr::sessionRemoveNode(std::string uuid) { return 0; }
+int SessionMgr::sessionRemoveNode(std::string nodeName) {
+  PipewireClient *pClientObj = nullptr;
+  if (sessionNodesMap.find(nodeName) == sessionNodesMap.end()) {
+    return -ENOENT;
+  }
+
+  pClientObj = sessionNodesMap[nodeName];
+  if (!pClientObj) {
+    return -EINVAL;
+  }
+  delete pClientObj;
+
+  // Evict from the map
+  sessionNodesMap.erase(nodeName);
+  return 0;
+}
 int SessionMgr::sessionUpdateNodeParam(std::string nodeName, int paramIdx,
                                        float val) {
   PipewireClient *pClient = nullptr;
