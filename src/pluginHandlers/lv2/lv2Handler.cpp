@@ -1,6 +1,7 @@
 #include <errno.h>
 #include <lilv/lilv.h>
 #include <limits>
+#include <lv2/atom/util.h>
 #include <lv2/core/lv2.h>
 #include <string>
 #include <unordered_map>
@@ -17,6 +18,7 @@
 
 #include "common.hpp"
 #include "config.hpp"
+#include "pluginHandlers/basePluginHandler.hpp"
 #include "pluginHandlers/lv2/lv2Handler.hpp"
 
 #define PLUGIN_ATOM_SEQ_BUFSIZE (4096)
@@ -142,9 +144,6 @@ int pluginLv2Deinitalize() {
 
 void LV2PluginHandler::populatePorts(const LilvPlugin *plugin) {
   int nPorts = -1;
-  nAudioInPorts = 0;
-  nAudioOutPorts = 0;
-  nControlPorts = 0;
 
   nPorts = lilv_plugin_get_num_ports(plugin);
   for (uint8_t idx = 0; idx < nPorts; ++idx) {
@@ -159,14 +158,39 @@ void LV2PluginHandler::populatePorts(const LilvPlugin *plugin) {
 
     // audio ports
     if (lilv_port_is_a(plugin, port, lilvNodeAudioPort)) {
+      desc.type = PORT_TYPE_AUDIO;
       if (lilv_port_is_a(plugin, port, lilvNodeInputPort)) {
         // audio-in ports
+        desc.dir = PORT_DIR_INPUT;
         this->audioInPortDesc.push_back(desc);
-        this->nAudioInPorts++;
       } else {
         // audio-out ports
+        desc.dir = PORT_DIR_OUTPUT;
         this->audioOutPortDesc.push_back(desc);
-        this->nAudioOutPorts++;
+      }
+    }
+
+    // Atom ports
+    else if (lilv_port_is_a(plugin, port, lilvNodeAtomPort)) {
+
+      if (lilv_port_supports_event(plugin, port, lilvNodeSupportsMidiEvent)) {
+        struct midiPortDesc portDesc;
+        LV2_Atom_Sequence *seqBuff = nullptr;
+        desc.dir = lilv_port_is_a(plugin, port, lilvNodeInputPort)
+                       ? PORT_DIR_INPUT
+                       : PORT_DIR_OUTPUT;
+        desc.type = PORT_TYPE_MIDI;
+
+        portDesc.portInfo = desc;
+        seqBuff = (LV2_Atom_Sequence *)portDesc.portData;
+        seqBuff->atom.type = lv2_urid_map(NULL, LV2_ATOM__Sequence);
+        seqBuff->atom.size = sizeof(LV2_Atom_Sequence_Body);
+
+        pluginConnectPort(desc.index, portDesc.portData);
+        midiPortDesc.push_back(portDesc);
+        SYSLOG_DBG("configuring MIDI port at idx [%d]\n", desc.index);
+      } else {
+        SYSLOG_ERR("Unsupported ATOM type for idx [%d]\n", desc.index);
       }
     }
 
@@ -176,6 +200,7 @@ void LV2PluginHandler::populatePorts(const LilvPlugin *plugin) {
       LilvScalePoints *sp;
       struct controlPortDesc ctrlPortDesc = {};
 
+      desc.type = PORT_TYPE_CONTROL;
       ctrlPortDesc.portInfo = desc;
       ctrlPortDesc.def = ctrlPortDesc.min = ctrlPortDesc.max =
           ctrlPortDesc.val = numeric_limits<float>::max();
@@ -223,33 +248,6 @@ void LV2PluginHandler::populatePorts(const LilvPlugin *plugin) {
                  ctrlPortDesc.portInfo.index);
       pluginConnectPort(ctrlPortDesc.portInfo.index, &ctrlPortDesc.val);
       controlPortDesc.push_back(ctrlPortDesc);
-      nControlPorts++;
-    }
-
-    // Atom ports
-    else if (lilv_port_is_a(plugin, port, lilvNodeAtomPort)) {
-
-      // midi port
-      LV2_Atom_Sequence *seqBuff =
-          (LV2_Atom_Sequence *)calloc(1, PLUGIN_ATOM_SEQ_BUFSIZE);
-
-      // Fill in headers
-      seqBuff->atom.type = 0;
-      seqBuff->atom.size = sizeof(LV2_Atom_Sequence_Body);
-      seqBuff->body.pad = 0;
-      seqBuff->body.unit = 0;
-
-      SYSLOG_DBG("configuring MIDI port at idx [%d]\n", desc.index);
-
-      /* Lilv does not give a way to get the reference back to this buffer.
-       * Store it locally so that it can be cleared later
-       */
-      heapBuffers.push_back((void *)seqBuff);
-      pluginConnectPort(desc.index, seqBuff);
-
-      if (lilv_port_supports_event(plugin, port, lilvNodeSupportsMidiEvent)) {
-        midiPortDesc.push_back(desc);
-      }
     }
   }
 }
@@ -259,7 +257,6 @@ int LV2PluginHandler::pluginRun(int nSamples) {
   if (pWorkerHdl) {
     pWorkerHdl->workerJobResponse();
   }
-  // TODO: Send MIDI buffers
   return 0;
 }
 
@@ -346,6 +343,56 @@ int LV2PluginHandler::pluginUpdateParam(uint8_t idx, float val) {
   return 0;
 }
 
+int LV2PluginHandler::pluginInitPod(uint8_t portIdx) {
+  for (struct midiPortDesc &midiPortDesc : midiPortDesc) {
+    if (midiPortDesc.portInfo.index == portIdx) {
+      seq = (LV2_Atom_Sequence *)midiPortDesc.portData;
+
+      // Initialize forge to append the Atom Events to the sequence buffer
+      lv2_atom_forge_set_buffer(&forge, (uint8_t *)&seq->atom,
+                                sizeof(LV2_Atom_Sequence));
+      lv2_atom_forge_sequence_head(&forge, &frame, 0);
+      return 0;
+    }
+  }
+  return -ENOENT;
+}
+
+int LV2PluginHandler::pluginAppendPodEvent(size_t offset, uint32_t len,
+                                           const uint8_t *data) {
+  // Assuming forge was setup earlier
+  lv2_atom_forge_frame_time(&forge, offset);
+  lv2_atom_forge_atom(&forge, len, lv2_urid_map(NULL, LV2_ATOM__Event));
+  lv2_atom_forge_write(&forge, (const void*)data, len);
+  return 0;
+}
+
+int LV2PluginHandler::pluginPodFinalize() {
+  lv2_atom_forge_pop(&forge, &frame);
+  return 0;
+}
+
+int LV2PluginHandler::pluginPodGetMidiOut(uint32_t portIdx, rawMidiOutCb_t cb, void *userData) {
+  const LV2_Atom_Sequence *seq;
+
+  if (!cb)
+    return -EINVAL;
+
+  for (struct midiPortDesc &midiPortDesc : midiPortDesc) {
+    if (midiPortDesc.portInfo.index == portIdx) {
+      seq = (LV2_Atom_Sequence *)midiPortDesc.portData;
+      break;
+    }
+  }
+
+  LV2_ATOM_SEQUENCE_FOREACH(seq, ev) {
+    if (ev->body.type == lv2_urid_map(NULL, LV2_ATOM__Event)) {
+      const uint8_t *eventData = (const uint8_t *)(ev + 1);
+      cb(ev->time.frames, ev->body.size, eventData, userData);
+    }
+  }
+  return 0;
+}
 
 int LV2PluginHandler::pluginDeactivate() {
   lilv_instance_deactivate(pluginInstance);

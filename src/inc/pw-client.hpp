@@ -1,5 +1,6 @@
 #pragma once
 #include "pluginHandlers/basePluginHandler.hpp"
+#include <cstdint>
 #include <pipewire/filter.h>
 #include <pipewire/pipewire.h>
 #include <string>
@@ -74,14 +75,15 @@ int initializePwLib();
 int teardownPwLib();
 
 enum pluginType { PLUGIN_TYPE_LV2 = 0 };
-
-struct pwUserPortDesc {
-  int pluginPortIdx;
+struct clientPortDesc {
+  struct portDesc *pluginPortDesc;
+  void *buff;
 };
 
 class PipewireClient {
 public:
   std::string filterNodeName;
+  std::vector<struct clientPortDesc *> clientPortList;
   int pwInitClient(std::string uri, enum pluginType pluginType);
   int pwUpdateClientParam(int clientPortIdx, float value);
   static int pwLinkClientPorts(std::string srcNodeName, std::string srcPortName,
@@ -95,13 +97,17 @@ public:
 
   void *getPluginMgr();
   void *getFilterNode();
-  std::vector<struct pwUserPortDesc *> &getPwPortDescList();
+  static void pwOnProcess(void *userData, struct spa_io_position *position);
   ~PipewireClient();
 
 private:
   struct pw_filter *filter;
   class PluginBase *pluginMgr;
-  std::vector<struct pwUserPortDesc *> userPortDescList;
+
   int pwAddInputPorts();
   int pwAddOutputPorts();
+  int pwAddMidiPorts();
+  int pwPreProcess(struct clientPortDesc *port, uint32_t nSamples);
+  int pwRunProcess(uint32_t nSamples);
+  int pwPostProcess(struct clientPortDesc *port, uint32_t nSamples);
 };
