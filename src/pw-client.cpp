@@ -319,7 +319,7 @@ int PipewireClient::pwAddInputPorts() {
     std::string portName = pluginMgr->audioInPortDesc[port].label;
 
     pUserPortDesc = (struct clientPortDesc *)pw_filter_add_port(
-        filter, PW_DIRECTION_INPUT, PW_FILTER_PORT_FLAG_MAP_BUFFERS,
+        filter, PW_DIRECTION_INPUT, PW_FILTER_PORT_FLAG_NONE,
         sizeof(struct clientPortDesc),
         pw_properties_new(PW_KEY_FORMAT_DSP, "32 bit float mono audio",
                           PW_KEY_PORT_NAME, portName.c_str(), NULL),
@@ -340,7 +340,7 @@ int PipewireClient::pwAddOutputPorts() {
     std::string portName = pluginMgr->audioOutPortDesc[port].label;
 
     pUserPortDesc = (struct clientPortDesc *)pw_filter_add_port(
-        filter, PW_DIRECTION_OUTPUT, PW_FILTER_PORT_FLAG_MAP_BUFFERS,
+        filter, PW_DIRECTION_OUTPUT, PW_FILTER_PORT_FLAG_NONE,
         sizeof(struct clientPortDesc),
         pw_properties_new(PW_KEY_FORMAT_DSP, "32 bit float mono audio",
                           PW_KEY_PORT_NAME, portName.c_str(), NULL),

@@ -24,11 +24,9 @@ SessionMgr::~SessionMgr() {
       PipewireClient *pClient = it->second;
       if (pClient)
         delete pClient;
-      // sessionNodesMap.erase(it);
     }
 
     teardownPwLib();
-
     initialized = false;
   }
 }

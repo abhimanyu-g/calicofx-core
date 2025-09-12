@@ -72,6 +72,10 @@ const LV2_Options_Option pluginOptions[] = {
     {LV2_OPTIONS_INSTANCE, 0, 0, 0, 0, NULL}};
 
 LV2_Feature pluginFeatOptions = {LV2_OPTIONS__options, (void *)pluginOptions};
+
+// Schedule work //////////////////////////////////////////////////////////////
+LV2_Worker_Schedule scheduleDesc = {};
+
 // end of Host supported Features /////////////////////////////////////////////
 
 LV2_URID lv2_urid_map(LV2_URID_Map_Handle handle, const char *uri) {
@@ -275,7 +279,7 @@ int LV2PluginHandler::pluginInit(void *uri) {
   LilvPlugin *plugin = nullptr;
 
   pWorkerHdl = nullptr;
-  LV2_Worker_Schedule scheduleDesc = {this, &workerStaticScheduler};
+
   LV2_Feature pluginFeatWorker = {LV2_WORKER__schedule, (void *)&scheduleDesc};
 
   if (!uri) {
@@ -299,6 +303,9 @@ int LV2PluginHandler::pluginInit(void *uri) {
     pluginName = string(lilv_node_as_string(pluginNode));
     lilv_node_free(pluginNode);
   }
+
+  scheduleDesc.handle = this;
+  scheduleDesc.schedule_work = &workerStaticScheduler;
 
   static const LV2_Feature *pluginSupportedFeatures[] = {
       &pluginFeatUnmapUrid, &pluginFeatMapUrid, &pluginFeatOptions,
