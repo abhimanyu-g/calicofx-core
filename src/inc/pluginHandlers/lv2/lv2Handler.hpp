@@ -37,7 +37,12 @@ public:
   int pluginAppendPodEvent(size_t offset, uint32_t len,
                            const uint8_t *data) override;
   int pluginPodFinalize() override;
-  int pluginPodGetMidiOut(uint32_t portIdx, rawMidiOutCb_t cb, void* userData) override;
+  int pluginPodGetMidiOut(uint32_t portIdx, rawMidiOutCb_t cb,
+                          void *userData) override;
+
+  static LV2_Worker_Status
+  workerStaticScheduler(LV2_Worker_Schedule_Handle handle, uint32_t size,
+                        const void *data);
 
 private:
   Worker *pWorkerHdl;
@@ -48,8 +53,7 @@ private:
   LV2_Atom_Forge forge;
   LV2_Atom_Forge_Frame frame;
   LV2_Atom_Sequence *seq;
+  LV2_Worker_Schedule scheduleDesc;
+
   void populatePorts(const LilvPlugin *plugin);
-  static LV2_Worker_Status
-  workerStaticScheduler(LV2_Worker_Schedule_Handle handle, uint32_t size,
-                        const void *data);
 };

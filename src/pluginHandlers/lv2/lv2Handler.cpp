@@ -73,9 +73,6 @@ const LV2_Options_Option pluginOptions[] = {
 
 LV2_Feature pluginFeatOptions = {LV2_OPTIONS__options, (void *)pluginOptions};
 
-// Schedule work //////////////////////////////////////////////////////////////
-LV2_Worker_Schedule scheduleDesc = {};
-
 // end of Host supported Features /////////////////////////////////////////////
 
 LV2_URID lv2_urid_map(LV2_URID_Map_Handle handle, const char *uri) {
